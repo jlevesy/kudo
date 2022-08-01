@@ -1,0 +1,48 @@
+{{/*
+Define CA and certificates necessary for the webhook setup.
+*/}}
+{{- $altNames := list ( printf "%s.%s" (include "helm.fullname" .) .Release.Namespace ) ( printf "%s.%s.svc" (include "helm.fullname" .) .Release.Namespace ) -}}
+{{- $ca := genCA "kudo-webhook-ca" 365 -}}
+{{- $cert := genSignedCert ( include "helm.fullname" . ) nil $altNames 365 $ca -}}
+---
+apiVersion: v1
+kind: Secret
+type: kubernetes.io/tls
+metadata:
+  name: {{ template "helm.certSecretName" . }}
+  labels:
+    app: {{ template "helm.fullname" . }}
+    chart: {{ template "helm.chart" . }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+  annotations:
+    "helm.sh/hook": "pre-install"
+    "helm.sh/hook-delete-policy": "before-hook-creation"
+data:
+  tls.crt: {{ $cert.Cert | b64enc }}
+  tls.key: {{ $cert.Key | b64enc }}
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: "mutationwebhook.k8s.kudo.dev"
+  labels:
+    {{- include "helm.labels" . | nindent 4 }}
+webhooks:
+- name: "v1alpha1.escalations.mutationwebhook.k8s.kudo.dev"
+  rules:
+  - apiGroups:   ["k8s.kudo.dev"]
+    apiVersions: ["v1alpha1"]
+    operations:  ["CREATE"]
+    resources:   ["escalations"]
+    scope:       "Cluster"
+  clientConfig:
+    service:
+      namespace: {{ .Release.Namespace }}
+      name: {{ include "helm.fullname" . }}
+      path: "/v1alpha1/escalations"
+      port: {{ .Values.service.port }}
+    caBundle: {{ $ca.Cert | b64enc }}
+  admissionReviewVersions: ["v1"]
+  sideEffects: None
+  timeoutSeconds: 5

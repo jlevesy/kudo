@@ -1,0 +1,6 @@
+apiVersion: v2
+name: kudo
+description: A Helm chart to install Kudo
+type: application
+version: "0.0.1"
+appVersion: "0.0.1"
