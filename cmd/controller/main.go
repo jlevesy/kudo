@@ -24,7 +24,7 @@ func main() {
 	mux.HandleFunc("/v1alpha1/escalations", handleV1Alpha1Escalations)
 
 	if err := srv.ListenAndServeTLS("/var/run/certs/tls.crt", "/var/run/certs/tls.key"); err != nil {
-		klog.V(0).Error(err, "Can't serve")
+		klog.V(0).ErrorS(err, "Can't serve")
 	}
 
 	klog.V(0).Info("Webhook handler exited")
