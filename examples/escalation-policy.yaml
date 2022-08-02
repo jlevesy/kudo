@@ -1,0 +1,22 @@
+---
+apiVersion: k8s.kudo.dev/v1alpha1
+kind: EscalationPolicy
+metadata:
+  name: rbac-escalation-policy-example
+spec:
+  subjects: # (required) who has the right to trigger this escalation.
+    - kind: Group
+      name: squad-a@group.com
+  challenges: # (optional) list of challenges being applied when esclating.
+    - kind: TwoFactor
+      reviewers:
+        - kind: Group
+          name: squad-b@voiapp.io
+  targets: # (required) what the escalation grants
+    - kind: KubernetesRoleBinding
+      duration: 60m
+      namespace: some-app
+      roleRef:
+        kind: ClusterRole
+        name: some-escalated-role
+        apiGroup: rbac.authorization.k8s.io
