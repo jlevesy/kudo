@@ -52,7 +52,7 @@ type Escalation struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	Spec   EscalationSpec   `json:"spec"`
-	Status EscalationStatus `json:"spec"`
+	Status EscalationStatus `json:"status"`
 }
 
 type EscalationSpec struct {
