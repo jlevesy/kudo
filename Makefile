@@ -1,4 +1,10 @@
 KO_DOCKER_REPO=ghcr.io/jlevesy/kudo
+CODE_GENERATOR_VERSION=0.24.3
+
+.PHONY: install_dependencies
+install_dependencies:
+	go get ./...
+	go install k8s.io/code-generator/cmd/...@v$(CODE_GENERATOR_VERSION)
 
 .PHONY: unit_tests
 unit_tests:
@@ -6,7 +12,7 @@ unit_tests:
 
 .PHONY: codegen_v1alpha1
 codegen_v1alpha1:
-	@bash ${GOPATH}/pkg/mod/k8s.io/code-generator@v0.24.3/generate-groups.sh \
+	@bash ${GOPATH}/pkg/mod/k8s.io/code-generator@v$(CODE_GENERATOR_VERSION)/generate-groups.sh \
 		all \
 		github.com/jlevesy/kudo/pkg/client \
 		github.com/jlevesy/kudo/pkg/apis \
