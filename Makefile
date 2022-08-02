@@ -13,7 +13,7 @@ codegen_v1alpha1:
 		k8s.kudo.dev:v1alpha1
 
 .PHONY: check_codegen
-check_codegen: codegen
+check_codegen: codegen_v1alpha1
 	@git diff --exit-code
 
 .PHONY: deploy_dev_crds
