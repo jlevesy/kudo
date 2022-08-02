@@ -10,16 +10,17 @@ install_dependencies:
 unit_tests:
 	go test -short -failfast -cover ./...
 
-.PHONY: codegen_v1alpha1
-codegen_v1alpha1:
+.PHONY: codegen
+codegen:
 	@bash ${GOPATH}/pkg/mod/k8s.io/code-generator@v$(CODE_GENERATOR_VERSION)/generate-groups.sh \
 		all \
-		github.com/jlevesy/kudo/pkg/client \
+		github.com/jlevesy/kudo/pkg/generated \
 		github.com/jlevesy/kudo/pkg/apis \
-		k8s.kudo.dev:v1alpha1
+		k8s.kudo.dev:v1alpha1 \
+		--go-header-file ./hack/boilerplate.go.txt
 
 .PHONY: check_codegen
-check_codegen: codegen_v1alpha1
+check_codegen: codegen
 	@git diff --exit-code
 
 .PHONY: deploy_dev_crds
