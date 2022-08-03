@@ -1,10 +1,15 @@
 package v1alpha1
 
 import (
-	"time"
-
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+const Version = "v1alpha1"
+
+const (
+	KindEscalation       = "Escalation"
+	KindEscalationPolicy = "EscalationPolicy"
 )
 
 // +genclient
@@ -30,10 +35,10 @@ type EscalationChallenge struct {
 }
 
 type EscalationTarget struct {
-	Kind      string         `json:"kind"`
-	Duration  time.Duration  `json:"duration"`
-	Namespace string         `json:"namespace"`
-	RoleRef   rbacv1.RoleRef `json:"roleRef"`
+	Kind      string          `json:"kind"`
+	Duration  metav1.Duration `json:"duration"`
+	Namespace string          `json:"namespace"`
+	RoleRef   rbacv1.RoleRef  `json:"roleRef"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
