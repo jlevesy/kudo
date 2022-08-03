@@ -1,0 +1,27 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "helm.fullname" . }}-controller
+rules:
+- apiGroups:
+    - "k8s.kudo.dev"
+  resources:
+    - "escalationpolicies"
+  verbs:
+    - "get"
+    - "list"
+    - "watch"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "helm.fullname" . }}-controller
+subjects:
+- kind: ServiceAccount
+  name: {{ include "helm.serviceAccountName" . }}
+  namespace: {{ default .Release.namespace "default" }}
+roleRef:
+  kind: ClusterRole
+  name: {{ include "helm.fullname" . }}-controller
+  apiGroup: rbac.authorization.k8s.io
