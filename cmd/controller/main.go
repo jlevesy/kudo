@@ -8,6 +8,7 @@ import (
 	"k8s.io/klog/v2"
 
 	clientset "github.com/jlevesy/kudo/pkg/generated/clientset/versioned"
+	"github.com/jlevesy/kudo/pkg/webhooksupport"
 	"github.com/jlevesy/kudo/webhook/escalation"
 )
 
@@ -38,7 +39,7 @@ func main() {
 	)
 	klog.Info("Starting webhook handler on addr", srv.Addr)
 
-	mux.Handle("/v1alpha1/escalations", webhookHandler)
+	mux.Handle("/v1alpha1/escalations", webhooksupport.MustPost(webhookHandler))
 
 	if err := srv.ListenAndServeTLS("/var/run/certs/tls.crt", "/var/run/certs/tls.key"); err != nil {
 		klog.V(0).ErrorS(err, "Can't serve")

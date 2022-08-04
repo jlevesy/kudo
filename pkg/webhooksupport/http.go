@@ -17,3 +17,16 @@ func WriteJSON(rw http.ResponseWriter, statusCode int, payload any) {
 		return
 	}
 }
+
+// MustPost is an HTTP middleware that only forwards POST requests.
+func MustPost(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.NotFound(rw, r)
+
+			return
+		}
+
+		next.ServeHTTP(rw, r)
+	})
+}
