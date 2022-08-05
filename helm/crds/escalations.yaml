@@ -16,6 +16,8 @@ spec:
     - name:    v1alpha1
       served:  true
       storage: true
+      subresources:
+          status: {}
       schema:
         openAPIV3Schema:
           type: object
@@ -32,25 +34,9 @@ spec:
               required:
                 - policyName
                 - reason
-            status:
-              type: object
-              properties:
-                state:
-                  type:    string
-                  default: "PENDING"
-                  enum:    ["PENDING", "DENIED", "ACCEPTED", "EXPIRED"]
-                stateDetails:
-                  type: string
-                  default: "Escalation is being processed"
-                targetRef:
-                  type:     object
-                  nullable: true
-                  properties:
-                    kind:
-                      type: string
-                    name:
-                      type: string
-                    namespace:
-                      type: string
-                    apiGroup:
-                      type: string
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

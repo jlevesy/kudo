@@ -28,6 +28,7 @@ jobs:
         uses: golangci/golangci-lint-action@v3
         with:
           version: v1.47.3
+          skip-cache: true # <- turns off caching as I suspect it conflicts with setup-go cache?
       - name: Run Unit Tests
         run: make unit_tests
 
