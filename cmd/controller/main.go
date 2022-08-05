@@ -22,11 +22,16 @@ import (
 var (
 	masterURL  string
 	kubeconfig string
+
+	whCfg webhookConfig
 )
 
 func main() {
 	flag.StringVar(&kubeconfig, "kubeconfig", "", "Path to a kubeconfig. Only required if out-of-cluster.")
 	flag.StringVar(&masterURL, "master", "", "The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
+	flag.StringVar(&whCfg.certPath, "webhook_cert", "", "Path to webhook TLS cert")
+	flag.StringVar(&whCfg.keyPath, "webhook_key", "", "Path to webhook TLS key")
+	flag.StringVar(&whCfg.addr, "webhook_addr", ":8080", "Webhook listening address")
 	klog.InitFlags(nil)
 
 	flag.Parse()
@@ -48,7 +53,7 @@ func main() {
 
 	group, ctx := errgroup.WithContext(ctx)
 
-	group.Go(func() error { return runWebhookHandler(ctx, kudoClientSet) })
+	group.Go(func() error { return runWebhookHandler(ctx, kudoClientSet, whCfg) })
 
 	if err := group.Wait(); err != nil {
 		klog.Error("Controller reported an error")
@@ -57,11 +62,17 @@ func main() {
 	klog.Info("Exited kudo controller")
 }
 
-func runWebhookHandler(ctx context.Context, kudoClientSet clientset.Interface) error {
+type webhookConfig struct {
+	certPath string
+	keyPath  string
+	addr     string
+}
+
+func runWebhookHandler(ctx context.Context, kudoClientSet clientset.Interface, cfg webhookConfig) error {
 	var (
 		mux = http.NewServeMux()
 		srv = &http.Server{
-			Addr:           ":443",
+			Addr:           cfg.addr,
 			Handler:        mux,
 			ReadTimeout:    5 * time.Second,
 			WriteTimeout:   5 * time.Second,
@@ -78,9 +89,26 @@ func runWebhookHandler(ctx context.Context, kudoClientSet clientset.Interface) e
 	mux.Handle("/v1alpha1/escalations", webhooksupport.MustPost(webhookHandler))
 
 	go func() {
-		klog.Info("Starting webhook server on addr", srv.Addr)
+		var err error
 
-		err := srv.ListenAndServeTLS("/var/run/certs/tls.crt", "/var/run/certs/tls.key")
+		if cfg.certPath == "" || cfg.keyPath == "" {
+			klog.InfoS("Starting INSECURE webhook server over HTTP", "addr", srv.Addr)
+
+			err = srv.ListenAndServe()
+		} else {
+			klog.InfoS(
+				"Starting webhook server over HTTPS",
+				"addr",
+				srv.Addr,
+				"cert_path",
+				cfg.certPath,
+				"key_path",
+				cfg.keyPath,
+			)
+
+			err = srv.ListenAndServeTLS(cfg.certPath, cfg.keyPath)
+		}
+
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			// If the server fails to serve, we need to stop.
 			serveFailed <- err

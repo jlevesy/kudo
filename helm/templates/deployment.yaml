@@ -30,6 +30,13 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: {{ include "helm.imageName" . }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - "-webhook_cert"
+            - "/var/run/certs/tls.crt"
+            - "-webhook_key"
+            - "/var/run/certs/tls.key"
+            - "-webhook_addr"
+            - ":443"
           ports:
             - name: https
               containerPort: 443
