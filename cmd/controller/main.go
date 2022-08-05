@@ -1,9 +1,16 @@
 package main
 
 import (
+	"context"
+	"errors"
+	"flag"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
+	"golang.org/x/sync/errgroup"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
 
@@ -12,38 +19,92 @@ import (
 	"github.com/jlevesy/kudo/webhook/escalation"
 )
 
-func main() {
-	var (
-		mux = http.NewServeMux()
-		srv = &http.Server{
-			Addr:           ":443",
-			Handler:        mux,
-			ReadTimeout:    10 * time.Second,
-			WriteTimeout:   10 * time.Second,
-			MaxHeaderBytes: 1 << 20, // 1048576
-		}
-	)
+var (
+	masterURL  string
+	kubeconfig string
+)
 
-	cfg, err := clientcmd.BuildConfigFromFlags("", "")
+func main() {
+	flag.StringVar(&kubeconfig, "kubeconfig", "", "Path to a kubeconfig. Only required if out-of-cluster.")
+	flag.StringVar(&masterURL, "master", "", "The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
+	klog.InitFlags(nil)
+
+	flag.Parse()
+
+	klog.Info("Starting kudo controller")
+
+	cfg, err := clientcmd.BuildConfigFromFlags(masterURL, kubeconfig)
 	if err != nil {
 		klog.Fatalf("Unable to build kube client configuration: %s", err.Error())
 	}
 
 	kudoClientSet, err := clientset.NewForConfig(cfg)
 	if err != nil {
-		klog.Fatalf("Unable to build kubedo clientset: %s", err.Error())
+		klog.Fatalf("Unable to build kudo clientset: %s", err.Error())
 	}
+
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+
+	group, ctx := errgroup.WithContext(ctx)
+
+	group.Go(func() error { return runWebhookHandler(ctx, kudoClientSet) })
+
+	if err := group.Wait(); err != nil {
+		klog.Error("Controller reported an error")
+	}
+
+	klog.Info("Exited kudo controller")
+}
+
+func runWebhookHandler(ctx context.Context, kudoClientSet clientset.Interface) error {
+	var (
+		mux = http.NewServeMux()
+		srv = &http.Server{
+			Addr:           ":443",
+			Handler:        mux,
+			ReadTimeout:    5 * time.Second,
+			WriteTimeout:   5 * time.Second,
+			MaxHeaderBytes: 1 << 20, // 1048576
+
+		}
+		serveFailed = make(chan error)
+	)
 
 	webhookHandler := escalation.NewWebhookHandler(
 		kudoClientSet.K8sV1alpha1().EscalationPolicies(),
 	)
-	klog.Info("Starting webhook handler on addr", srv.Addr)
 
 	mux.Handle("/v1alpha1/escalations", webhooksupport.MustPost(webhookHandler))
 
-	if err := srv.ListenAndServeTLS("/var/run/certs/tls.crt", "/var/run/certs/tls.key"); err != nil {
-		klog.V(0).ErrorS(err, "Can't serve")
+	go func() {
+		klog.Info("Starting webhook server on addr", srv.Addr)
+
+		err := srv.ListenAndServeTLS("/var/run/certs/tls.crt", "/var/run/certs/tls.key")
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			// If the server fails to serve, we need to stop.
+			serveFailed <- err
+		}
+	}()
+
+	select {
+	case err := <-serveFailed:
+		klog.ErrorS(err, "Server exited reporting an error")
+		return err
+	case <-ctx.Done():
+		klog.Info("Main context exited, gracefully stoping server")
 	}
 
-	klog.V(0).Info("Webhook handler exited")
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		klog.ErrorS(err, "shutdown reported an error, closing the server")
+
+		_ = srv.Close()
+	}
+
+	klog.Info("Webhook server exited")
+
+	return nil
 }
