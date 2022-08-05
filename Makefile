@@ -23,23 +23,31 @@ codegen:
 check_codegen: codegen
 	@git diff --exit-code
 
-.PHONY: deploy_dev_crds
-deploy_dev_crds:
+.PHONY: run_controller_local
+run_controller_local:
+	go run ./cmd/controller -kubeconfig=${HOME}/.kube/config
+
+.PHONY: deploy_crds_dev
+deploy_crds_dev:
 	kubectl apply -f ./helm/crds
 
 .PHONY: deploy_dev
-deploy_dev: deploy_dev_crds
+deploy_dev: deploy_crds_dev
 	helm template \
 		--values helm/values.yaml \
 		--set image.devRef=ko://github.com/jlevesy/kudo/cmd/controller \
 		kudo-dev ./helm | KO_DOCKER_REPO=$(KO_DOCKER_REPO) ko apply -B -t dev -f -
 
-.PHONY: create_dev_cluster
-create_dev_cluster:
+.PHONY: logs_dev
+logs_dev:
+	kubectl logs -f -l app.kubernetes.io/name=kudo
+
+.PHONY: create_cluster_dev
+create_cluster_dev:
 	k3d cluster create \
 		--image="rancher/k3s:v1.24.3-k3s1" \
 		kudo-dev
 
-.PHONY: delete_dev_cluster
-delete_dev_cluster:
+.PHONY: delete_cluster_dev
+delete_cluster_dev:
 	k3d cluster delete kudo-dev

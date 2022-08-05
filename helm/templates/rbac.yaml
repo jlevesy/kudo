@@ -8,6 +8,7 @@ rules:
     - "k8s.kudo.dev"
   resources:
     - "escalationpolicies"
+    - "escalations"
   verbs:
     - "get"
     - "list"
