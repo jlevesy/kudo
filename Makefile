@@ -27,9 +27,17 @@ check_codegen: codegen
 run_controller_local:
 	go run ./cmd/controller -kubeconfig=${HOME}/.kube/config
 
+.PHONY: run_dev
+run_dev: create_cluster_dev deploy_dev create_test_user_dev deploy_kudo_resources_dev
+
 .PHONY: deploy_crds_dev
 deploy_crds_dev:
 	kubectl apply -f ./helm/crds
+
+.PHONY: deploy_kudo_resources_dev
+deploy_kudo_resources_dev:
+	kubectl apply -f ./examples/escalation-rbac.yaml
+	kubectl apply -f ./examples/escalation-policy.yaml
 
 .PHONY: deploy_dev
 deploy_dev: deploy_crds_dev
@@ -49,5 +57,22 @@ create_cluster_dev:
 		kudo-dev
 
 .PHONY: delete_cluster_dev
-delete_cluster_dev:
+delete_cluster_dev: delete_test_user_dev
 	k3d cluster delete kudo-dev
+
+.PHONY: create_test_user_dev
+create_test_user_dev:
+	./hack/create-test-user.sh
+
+.PHONY: delete_test_user_dev
+delete_test_user_dev:
+	-kubectl config delete-user kudo-test-user
+	-kubectl config delete-context kudo-test-user
+
+.PHONY: use_admin_user_dev
+use_admin_user_dev:
+	kubectl config use-context k3d-kudo-dev
+
+.PHONY: use_test_user_dev
+use_test_user_dev:
+	kubectl config use-context kudo-test-user
