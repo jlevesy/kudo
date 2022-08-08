@@ -2,11 +2,13 @@ package escalation_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -15,9 +17,11 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/cache"
 
 	kudov1alpha1 "github.com/jlevesy/kudo/pkg/apis/k8s.kudo.dev/v1alpha1"
 	"github.com/jlevesy/kudo/pkg/generated/clientset/versioned/fake"
+	kudoinformers "github.com/jlevesy/kudo/pkg/generated/informers/externalversions"
 	"github.com/jlevesy/kudo/pkg/generics"
 	"github.com/jlevesy/kudo/webhook/escalation"
 )
@@ -311,6 +315,7 @@ func TestEscalationWebhookHandler_ServeHTTP(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.desc, func(t *testing.T) {
 			var (
+				ctx, cancel    = context.WithTimeout(context.Background(), time.Second)
 				responseWriter = httptest.NewRecorder()
 				request        = httptest.NewRequest(
 					http.MethodPost,
@@ -318,13 +323,25 @@ func TestEscalationWebhookHandler_ServeHTTP(t *testing.T) {
 					test.requestBody,
 				)
 
-				policiesClient = fake.NewSimpleClientset(
-					k8sStateFixtures...,
+				fakeClient = fake.NewSimpleClientset(k8sStateFixtures...)
+
+				informersFactories = kudoinformers.NewSharedInformerFactory(
+					fakeClient,
+					60*time.Second,
 				)
-				handler = escalation.NewWebhookHandler(
-					policiesClient.K8sV1alpha1().EscalationPolicies(),
-				)
+
+				escalationPolicyInformer = informersFactories.K8s().V1alpha1().EscalationPolicies()
+
+				handler = escalation.NewWebhookHandler(escalationPolicyInformer.Lister())
 			)
+
+			defer cancel()
+
+			informersFactories.Start(ctx.Done())
+
+			if ok := cache.WaitForCacheSync(ctx.Done(), escalationPolicyInformer.Informer().HasSynced); !ok {
+				t.Fatal("Cache sync failed, failing test...")
+			}
 
 			handler.ServeHTTP(responseWriter, request)
 
