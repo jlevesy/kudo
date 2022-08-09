@@ -19,11 +19,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
 
+	"github.com/jlevesy/kudo/escalation"
 	kudov1alpha1 "github.com/jlevesy/kudo/pkg/apis/k8s.kudo.dev/v1alpha1"
 	"github.com/jlevesy/kudo/pkg/generated/clientset/versioned/fake"
 	kudoinformers "github.com/jlevesy/kudo/pkg/generated/informers/externalversions"
 	"github.com/jlevesy/kudo/pkg/generics"
-	"github.com/jlevesy/kudo/webhook/escalation"
 )
 
 const requestUID = "request-uid"
