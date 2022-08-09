@@ -26,7 +26,7 @@ type EscalationPolicy struct {
 type EscalationPolicySpec struct {
 	Subjects   []rbacv1.Subject      `json:"subjects"`
 	Challenges []EscalationChallenge `json:"challenges"`
-	Targets    []EscalationTarget    `json:"targets"`
+	Target     EscalationTargetSpec  `json:"target"`
 }
 
 type EscalationChallenge struct {
@@ -34,11 +34,15 @@ type EscalationChallenge struct {
 	Reviewers []rbacv1.Subject `json:"reviewers"`
 }
 
-type EscalationTarget struct {
-	Kind      string          `json:"kind"`
-	Duration  metav1.Duration `json:"duration"`
-	Namespace string          `json:"namespace"`
-	RoleRef   rbacv1.RoleRef  `json:"roleRef"`
+type EscalationTargetSpec struct {
+	Duration metav1.Duration   `json:"duration"`
+	Grants   []EscalationGrant `json:"grants"`
+}
+
+type EscalationGrant struct {
+	Kind      string         `json:"kind"`
+	Namespace string         `json:"namespace"`
+	RoleRef   rbacv1.RoleRef `json:"roleRef"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -77,12 +81,12 @@ const (
 )
 
 type EscalationStatus struct {
-	State        EscalationState       `json:"state"`
-	StateDetails string                `json:"stateDetails"`
-	TargetRefs   []EscalationTargetRef `json:"targetRefs"`
+	State        EscalationState      `json:"state"`
+	StateDetails string               `json:"stateDetails"`
+	GrantRefs    []EscalationGrantRef `json:"grantRefs"`
 }
 
-type EscalationTargetRef struct {
+type EscalationGrantRef struct {
 	Kind      string `json:"kind"`
 	Name      string `json:"name"`
 	Namespace string `json:"namespace"`

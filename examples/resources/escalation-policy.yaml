@@ -12,9 +12,10 @@ spec:
       reviewers:
         - kind: Group
           name: squad-b@voiapp.io
-  targets: # (required) what the escalation grants
+  target: # (required) what the escalation grants
+    duration: 30s
+    grants:
     - kind: KubernetesRoleBinding
-      duration: 60m
       namespace: some-app
       roleRef:
         kind: ClusterRole
