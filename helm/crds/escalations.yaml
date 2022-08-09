@@ -34,6 +34,13 @@ spec:
               required:
                 - policyName
                 - reason
+            status:
+              type: object
+              properties:
+                state:
+                  type: string
+                stateDetails:
+                  type: string
 status:
   acceptedNames:
     kind: ""
