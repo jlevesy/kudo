@@ -77,9 +77,9 @@ const (
 )
 
 type EscalationStatus struct {
-	State        EscalationState     `json:"state"`
-	StateDetails string              `json:"stateDetails"`
-	TargetRef    EscalationTargetRef `json:"targetRef"`
+	State        EscalationState       `json:"state"`
+	StateDetails string                `json:"stateDetails"`
+	TargetRefs   []EscalationTargetRef `json:"targetRefs"`
 }
 
 type EscalationTargetRef struct {
