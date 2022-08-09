@@ -44,13 +44,20 @@ Some resources about admission webhooks:
 
 That one deserves some thinking. We must absolutely make sure that the controller doesn't link bindings of any kind, that would be a bad bad security flaw.
 
-My naive first though would be:
-- Schedule deletion as soon as the binding is created in memory (fancy go run).
-- Periodically scan all created bindings to make sure that all are scheduled or not expired.
+I was hoping to have some kind of expiration mechanism provided by the API server for bindings, so far I did not find it. Looks like [this is not going to be done](https://github.com/kubernetes/kubernetes/issues/87433#issuecomment-582618496)
 
-I was hoping to have some kind of expiration mechanism provided by the API server, so far I did not find it.
+After more discussion, we're going to closely look into that strategy:
 
-- Other idea: use a reclaim cronjob? I think I like that one better because I don't have to deal with who's in charge when running a multi controller setup. Would that be less secure? What if the reclaim job can't be scheduled. bad!
+- Use a [finalizer](https://kubernetes.io/docs/concepts/overview/working-with-objects/finalizers/) to expire all the escalations and destroy all bindings managed by kudo.
+- Use the informer resync to check if the escalation and the binding status needs to be updated (that would be the reconciliation loop for bindings)
+- Periodicaly scan through all owned resources and see if they need to be reclaimed or not (this would be the garbage collection loop)
+- Proooobably understand [this](https://kubernetes.io/docs/concepts/architecture/garbage-collection/#owners-dependents) as well.
+
+Kudos to @jeepsers for the insights!
+
+#### Other ideas
+
+- Use a reclaim cronjob? I think I like that one better because I don't have to deal with who's in charge when running a multi controller setup. Would that be less secure? What if the reclaim job can't be scheduled. bad!
 
 ### How to setup and declare CRDs ?
 
