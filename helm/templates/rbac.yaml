@@ -5,6 +5,21 @@ metadata:
   name: {{ include "helm.fullname" . }}-controller
 rules:
 - apiGroups:
+    - "rbac.authorization.k8s.io"
+  resources:
+    - "roles"
+    - "clusterroles"
+  verbs:
+    - "bind"
+    - "escalate"
+- apiGroups:
+    - "rbac.authorization.k8s.io"
+  resources:
+    - "clusterrolebindings"
+    - "rolebindings"
+  verbs:
+    - "create"
+- apiGroups:
     - "k8s.kudo.dev"
   resources:
     - "escalationpolicies"
@@ -13,6 +28,12 @@ rules:
     - "get"
     - "list"
     - "watch"
+- apiGroups:
+    - "k8s.kudo.dev"
+  resources:
+    - "escalations/status"
+  verbs:
+    - "update"
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

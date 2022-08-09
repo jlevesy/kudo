@@ -18,5 +18,5 @@ spec:
       namespace: some-app
       roleRef:
         kind: ClusterRole
-        name: some-escalated-role
+        name: config-viewer
         apiGroup: rbac.authorization.k8s.io

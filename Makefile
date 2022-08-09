@@ -28,16 +28,15 @@ run_controller_local:
 	go run ./cmd/controller -kubeconfig=${HOME}/.kube/config
 
 .PHONY: run_dev
-run_dev: create_cluster_dev deploy_dev create_test_user_dev deploy_kudo_resources_dev
+run_dev: create_cluster_dev deploy_dev create_test_user_dev deploy_environment_resources_dev
 
 .PHONY: deploy_crds_dev
 deploy_crds_dev:
 	kubectl apply -f ./helm/crds
 
-.PHONY: deploy_kudo_resources_dev
-deploy_kudo_resources_dev:
-	kubectl apply -f ./examples/escalation-rbac.yaml
-	kubectl apply -f ./examples/escalation-policy.yaml
+.PHONY: deploy_environment_resources_dev
+deploy_environment_resources_dev:
+	kubectl apply -f ./examples/resources
 
 .PHONY: deploy_dev
 deploy_dev: deploy_crds_dev

@@ -50,7 +50,7 @@ type testHandler struct {
 	done      func()
 }
 
-func (h *testHandler) OnAdd(*int) error {
+func (h *testHandler) OnAdd(context.Context, *int) error {
 	v := h.addReceived
 	h.addReceived++
 	// On first call, return transient error to test the retry behavior.
@@ -61,13 +61,13 @@ func (h *testHandler) OnAdd(*int) error {
 	return nil
 }
 
-func (h *testHandler) OnUpdate(_, _ *int) error {
+func (h *testHandler) OnUpdate(_ context.Context, _, _ *int) error {
 	h.updateReceived++
 	h.call()
 	return nil
 }
 
-func (h *testHandler) OnDelete(*int) error {
+func (h *testHandler) OnDelete(context.Context, *int) error {
 	h.deleteReceived++
 	h.call()
 	return nil

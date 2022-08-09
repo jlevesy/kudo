@@ -17,9 +17,9 @@ var ErrTransientError = errors.New("transient error")
 // EventHandler represents a object that handles mutation event  a k8s object.
 // It is based on k8s-clen cache.EventHandler.
 type EventHandler[T any] interface {
-	OnAdd(obj *T) error
-	OnUpdate(oldObj, newObj *T) error
-	OnDelete(obj *T) error
+	OnAdd(ctx context.Context, obj *T) error
+	OnUpdate(ctx context.Context, oldObj, newObj *T) error
+	OnDelete(ctx context.Context, obj *T) error
 }
 
 // QueuedEventHandler implements cache.EventHandler over a workqueue.
@@ -110,7 +110,7 @@ func (h *QueuedEventHandler[T]) processItem(ctx context.Context) bool {
 			return true
 		}
 
-		err = h.handler.OnAdd(typedObject)
+		err = h.handler.OnAdd(ctx, typedObject)
 	case kindUpdate:
 		typedOldObject, okOld := event.oldObj.(*T)
 		typedNewObject, okNew := event.newObj.(*T)
@@ -120,7 +120,7 @@ func (h *QueuedEventHandler[T]) processItem(ctx context.Context) bool {
 			return true
 		}
 
-		err = h.handler.OnUpdate(typedOldObject, typedNewObject)
+		err = h.handler.OnUpdate(ctx, typedOldObject, typedNewObject)
 
 	case kindDelete:
 		typedObject, ok := event.object.(*T)
@@ -129,7 +129,7 @@ func (h *QueuedEventHandler[T]) processItem(ctx context.Context) bool {
 			return true
 		}
 
-		err = h.handler.OnDelete(typedObject)
+		err = h.handler.OnDelete(ctx, typedObject)
 
 	default:
 		h.workqueue.Forget(obj)

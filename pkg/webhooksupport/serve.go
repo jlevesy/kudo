@@ -1,4 +1,4 @@
-package webhook
+package webhooksupport
 
 import (
 	"context"
@@ -7,9 +7,6 @@ import (
 	"time"
 
 	"k8s.io/klog/v2"
-
-	"github.com/jlevesy/kudo/pkg/webhooksupport"
-	"github.com/jlevesy/kudo/webhook/escalation"
 )
 
 type ServerConfig struct {
@@ -18,9 +15,8 @@ type ServerConfig struct {
 	Addr     string
 }
 
-func RunServer(ctx context.Context, webhookHandler *escalation.WebhookHandler, cfg ServerConfig) error {
+func Serve(ctx context.Context, cfg ServerConfig, mux *http.ServeMux) error {
 	var (
-		mux = http.NewServeMux()
 		srv = &http.Server{
 			Addr:           cfg.Addr,
 			Handler:        mux,
@@ -31,8 +27,6 @@ func RunServer(ctx context.Context, webhookHandler *escalation.WebhookHandler, c
 		}
 		serveFailed = make(chan error)
 	)
-
-	mux.Handle("/v1alpha1/escalations", webhooksupport.MustPost(webhookHandler))
 
 	go func() {
 		var err error

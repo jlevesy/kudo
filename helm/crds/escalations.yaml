@@ -34,6 +34,27 @@ spec:
               required:
                 - policyName
                 - reason
+            status:
+              type: object
+              properties:
+                state:
+                  type: string
+                stateDetails:
+                  type: string
+                targetRefs:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      kind:
+                        type: string
+                      name:
+                        type: string
+                      namespace:
+                        type: string
+                      apiGroup:
+                        type: string
+
 status:
   acceptedNames:
     kind: ""

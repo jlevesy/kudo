@@ -3,28 +3,30 @@ package main
 import (
 	"context"
 	"flag"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
 	"golang.org/x/sync/errgroup"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
 
+	"github.com/jlevesy/kudo/escalation"
 	kudov1alpha1 "github.com/jlevesy/kudo/pkg/apis/k8s.kudo.dev/v1alpha1"
 	"github.com/jlevesy/kudo/pkg/controllersupport"
 	clientset "github.com/jlevesy/kudo/pkg/generated/clientset/versioned"
 	kudoinformers "github.com/jlevesy/kudo/pkg/generated/informers/externalversions"
-	"github.com/jlevesy/kudo/webhook"
-	escalationwebhook "github.com/jlevesy/kudo/webhook/escalation"
+	"github.com/jlevesy/kudo/pkg/webhooksupport"
 )
 
 var (
 	masterURL  string
 	kubeconfig string
 
-	webhookConfig webhook.ServerConfig
+	webhookConfig webhooksupport.ServerConfig
 )
 
 const defaultInformerResyncInterval = 30 * time.Second
@@ -46,6 +48,11 @@ func main() {
 		klog.Fatalf("Unable to build kube client configuration: %s", err.Error())
 	}
 
+	kubeClient, err := kubernetes.NewForConfig(cfg)
+	if err != nil {
+		klog.Fatalf("Unable to build the kubernetes clientset: %s", err.Error())
+	}
+
 	kudoClientSet, err := clientset.NewForConfig(cfg)
 	if err != nil {
 		klog.Fatalf("Unable to build kudo clientset: %s", err.Error())
@@ -55,33 +62,35 @@ func main() {
 	defer cancel()
 
 	var (
+		serveMux = http.NewServeMux()
+
 		kudoInformerFactory = kudoinformers.NewSharedInformerFactory(kudoClientSet, defaultInformerResyncInterval)
-		escalationHandler   = controllersupport.NewQueuedEventHandler[kudov1alpha1.Escalation](
-			&logHandler{},
+		escalationsInformer = kudoInformerFactory.K8s().V1alpha1().Escalations().Informer()
+		escalationsClient   = kudoClientSet.K8sV1alpha1().Escalations()
+		policiesLister      = kudoInformerFactory.K8s().V1alpha1().EscalationPolicies().Lister()
+
+		escalationEventsHandler = controllersupport.NewQueuedEventHandler[kudov1alpha1.Escalation](
+			escalation.NewEventHandler(
+				policiesLister,
+				escalationsClient,
+				kubeClient.RbacV1(),
+			),
 			kudov1alpha1.KindEscalation,
 			2,
 		)
-		webhookHandler = escalationwebhook.NewWebhookHandler(
-			kudoInformerFactory.K8s().V1alpha1().EscalationPolicies().Lister(),
-		)
+		escalationWebhookHandler = escalation.NewWebhookHandler(policiesLister)
 	)
+
+	escalationsInformer.AddEventHandler(escalationEventsHandler)
+	serveMux.Handle("/v1alpha1/escalations", webhooksupport.MustPost(escalationWebhookHandler))
 
 	group, ctx := errgroup.WithContext(ctx)
 
-	klog.Info("Starting controller...")
-
-	group.Go(func() error {
-		return webhook.RunServer(ctx, webhookHandler, webhookConfig)
-	})
-
-	group.Go(func() error {
-		escalationHandler.Run(ctx)
-		return nil
-	})
-
-	klog.Info("Starting informers, waiting for them to warm up...")
+	klog.Info("Starting informers...")
 
 	kudoInformerFactory.Start(ctx.Done())
+
+	klog.Info("Waiting for the informers to warm up...")
 
 	syncResult := kudoInformerFactory.WaitForCacheSync(ctx.Done())
 
@@ -91,28 +100,22 @@ func main() {
 		}
 	}
 
-	klog.Info("Informers warmed up, controller is up and running!")
+	klog.Info("Informers warmed up, starting controller...")
+
+	group.Go(func() error {
+		return webhooksupport.Serve(ctx, webhookConfig, serveMux)
+	})
+
+	group.Go(func() error {
+		escalationEventsHandler.Run(ctx)
+		return nil
+	})
+
+	klog.Info("Controller is up and running")
 
 	if err := group.Wait(); err != nil {
 		klog.Error("Controller reported an error")
 	}
 
 	klog.Info("Exited kudo controller")
-}
-
-type logHandler struct{}
-
-func (logHandler) OnAdd(escalation *kudov1alpha1.Escalation) error {
-	klog.Info("RECEIVED AN ADD ==>", escalation.Name)
-	return nil
-}
-
-func (logHandler) OnUpdate(oldEsc, newEsc *kudov1alpha1.Escalation) error {
-	klog.Info("RECEIVED AN UPDATE ==>", oldEsc.Name)
-	return nil
-}
-
-func (logHandler) OnDelete(esc *kudov1alpha1.Escalation) error {
-	klog.Info("RECEIVED A DELETE ==>", esc.Name)
-	return nil
 }
