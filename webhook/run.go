@@ -8,7 +8,6 @@ import (
 
 	"k8s.io/klog/v2"
 
-	clientset "github.com/jlevesy/kudo/pkg/generated/clientset/versioned"
 	"github.com/jlevesy/kudo/pkg/webhooksupport"
 	"github.com/jlevesy/kudo/webhook/escalation"
 )
@@ -19,7 +18,7 @@ type ServerConfig struct {
 	Addr     string
 }
 
-func RunServer(ctx context.Context, kudoClientSet clientset.Interface, cfg ServerConfig) error {
+func RunServer(ctx context.Context, webhookHandler *escalation.WebhookHandler, cfg ServerConfig) error {
 	var (
 		mux = http.NewServeMux()
 		srv = &http.Server{
@@ -31,10 +30,6 @@ func RunServer(ctx context.Context, kudoClientSet clientset.Interface, cfg Serve
 
 		}
 		serveFailed = make(chan error)
-	)
-
-	webhookHandler := escalation.NewWebhookHandler(
-		kudoClientSet.K8sV1alpha1().EscalationPolicies(),
 	)
 
 	mux.Handle("/v1alpha1/escalations", webhooksupport.MustPost(webhookHandler))

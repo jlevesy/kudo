@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"golang.org/x/sync/errgroup"
-	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
 
@@ -18,6 +17,7 @@ import (
 	clientset "github.com/jlevesy/kudo/pkg/generated/clientset/versioned"
 	kudoinformers "github.com/jlevesy/kudo/pkg/generated/informers/externalversions"
 	"github.com/jlevesy/kudo/webhook"
+	escalationwebhook "github.com/jlevesy/kudo/webhook/escalation"
 )
 
 var (
@@ -56,30 +56,22 @@ func main() {
 
 	var (
 		kudoInformerFactory = kudoinformers.NewSharedInformerFactory(kudoClientSet, defaultInformerResyncInterval)
-		escalationsInformer = kudoInformerFactory.K8s().V1alpha1().Escalations().Informer()
 		escalationHandler   = controllersupport.NewQueuedEventHandler[kudov1alpha1.Escalation](
 			&logHandler{},
 			kudov1alpha1.KindEscalation,
 			2,
 		)
+		webhookHandler = escalationwebhook.NewWebhookHandler(
+			kudoInformerFactory.K8s().V1alpha1().EscalationPolicies().Lister(),
+		)
 	)
-
-	escalationsInformer.AddEventHandler(escalationHandler)
 
 	group, ctx := errgroup.WithContext(ctx)
 
-	klog.Info("Starting informers, waiting for them to warm up...")
-
-	kudoInformerFactory.Start(ctx.Done())
-
-	if ok := cache.WaitForCacheSync(ctx.Done(), escalationsInformer.HasSynced); !ok {
-		klog.Fatal("Cache sync failed, exiting...")
-	}
-
-	klog.Info("Informers warmed up, starting controller...")
+	klog.Info("Starting controller...")
 
 	group.Go(func() error {
-		return webhook.RunServer(ctx, kudoClientSet, webhookConfig)
+		return webhook.RunServer(ctx, webhookHandler, webhookConfig)
 	})
 
 	group.Go(func() error {
@@ -87,7 +79,19 @@ func main() {
 		return nil
 	})
 
-	klog.Info("Controller up and running!")
+	klog.Info("Starting informers, waiting for them to warm up...")
+
+	kudoInformerFactory.Start(ctx.Done())
+
+	syncResult := kudoInformerFactory.WaitForCacheSync(ctx.Done())
+
+	for typ, ok := range syncResult {
+		if !ok {
+			klog.Fatalf("Cache sync failed for %s, exiting", typ.String())
+		}
+	}
+
+	klog.Info("Informers warmed up, controller is up and running!")
 
 	if err := group.Wait(); err != nil {
 		klog.Error("Controller reported an error")

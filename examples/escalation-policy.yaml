@@ -6,7 +6,7 @@ metadata:
 spec:
   subjects: # (required) who has the right to trigger this escalation.
     - kind: Group
-      name: squad-a@group.com
+      name: kudo-test-group
   challenges: # (optional) list of challenges being applied when esclating.
     - kind: TwoFactor
       reviewers:

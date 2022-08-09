@@ -1,7 +1,6 @@
 package escalation
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -35,7 +34,7 @@ var (
 )
 
 type EscalationPoliciesGetter interface {
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1alpha1.EscalationPolicy, error)
+	Get(name string) (*v1alpha1.EscalationPolicy, error)
 }
 
 type WebhookHandler struct {
@@ -126,11 +125,7 @@ func (h *WebhookHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 
 	}
 
-	policy, err := h.policiesGetter.Get(
-		r.Context(),
-		escalation.Spec.PolicyName,
-		metav1.GetOptions{},
-	)
+	policy, err := h.policiesGetter.Get(escalation.Spec.PolicyName)
 
 	switch {
 	case errors.IsNotFound(err):
@@ -138,7 +133,7 @@ func (h *WebhookHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 			"User submitted an escalation request refering to a policy that doesn't exist",
 			usernameAndPolicyTags(
 				review.Request.UserInfo.Username,
-				"unknown",
+				escalation.Spec.PolicyName,
 			)...,
 		)
 
