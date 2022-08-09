@@ -27,7 +27,7 @@ spec:
               properties:
                 policyName:
                   type: string
-                submittedBy:
+                requestor:
                   type: string
                 reason:
                   type: string

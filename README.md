@@ -35,7 +35,7 @@ And this is where Kudo comes into play! This Kubernetes controller aims to;
 ### Knowing who is creating the escalation?
 
 We'll actually use an AdmissionWebhook, as the `AdmissionRequest` carries [the necessary user information](https://github.com/kubernetes/kubernetes/blob/master/pkg/apis/admission/types.go#L97).
-This webhook will also ask a patch the resource to set the `spec.submittedBy` field of the escalation.
+This webhook will also ask a patch the resource to set the `spec.requestor` field of the escalation.
 
 Some resources about admission webhooks:
 - https://medium.com/ovni/writing-a-very-basic-kubernetes-mutating-admission-webhook-398dbbcb63ec
@@ -102,7 +102,7 @@ It is composed by the following attributes:
 
 - `spec`: spec of the escalation
   - `policyName`: name of the policy being used to escalate
-  - `submittedBy`: identifier of the user asking for permission escalation
+  - `requestor`: identifier of the user asking for permission escalation
   - `reason`: a reason to explain why the user is asking to escalate their permissions
 
 - `status`: current status of the escalation:
@@ -122,7 +122,7 @@ metadata:
   name: escalation-abbdfff3
 spec:
   policyName: rbac-escalation-exaple
-  submittedBy: user-1@kubecluster.com
+  requestor: user-1@kubecluster.com
   reason: "Needs access to squad-b namespace to debug my service"
 status:
   state: "ACCEPTED"

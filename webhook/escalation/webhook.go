@@ -195,7 +195,7 @@ func (h *WebhookHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 
 	klog.InfoS(
 		"User submitted an escalation request",
-		"username",
+		"requestor",
 		review.Request.UserInfo.Username,
 		"policy",
 		escalation.Spec.PolicyName,
@@ -238,7 +238,7 @@ func genObjectPatch(user authenticationv1.UserInfo) ([]byte, error) {
 	}{
 		{
 			Op:    "replace",
-			Path:  "/spec/submittedBy",
+			Path:  "/spec/requestor",
 			Value: user.Username,
 		},
 	}

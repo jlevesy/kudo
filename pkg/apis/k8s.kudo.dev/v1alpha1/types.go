@@ -61,9 +61,9 @@ type Escalation struct {
 }
 
 type EscalationSpec struct {
-	PolicyName  string `json:"policyName"`
-	SubmittedBy string `json:"submittedBy"`
-	Reason      string `json:"reason"`
+	PolicyName string `json:"policyName"`
+	Requestor  string `json:"requestor"`
+	Reason     string `json:"reason"`
 }
 
 type EscalationState string
