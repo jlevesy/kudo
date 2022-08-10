@@ -52,7 +52,7 @@ spec:
                         type: string
                       namespace:
                         type: string
-                      apiGroup:
+                      status:
                         type: string
 
 status:

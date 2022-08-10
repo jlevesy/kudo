@@ -86,11 +86,19 @@ type EscalationStatus struct {
 	GrantRefs    []EscalationGrantRef `json:"grantRefs"`
 }
 
+type GrantStatus string
+
+const (
+	GrantStatusUnknown   GrantStatus = ""
+	GrantStatusCreated   GrantStatus = "CREATED"
+	GrantStatusReclaimed GrantStatus = "RECLAIMED"
+)
+
 type EscalationGrantRef struct {
-	Kind      string `json:"kind"`
-	Name      string `json:"name"`
-	Namespace string `json:"namespace"`
-	APIGroup  string `json:"apiGroup"`
+	Kind      string      `json:"kind"`
+	Name      string      `json:"name"`
+	Namespace string      `json:"namespace"`
+	Status    GrantStatus `json:"status"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
