@@ -1,6 +1,7 @@
 package v1alpha1
 
 import (
+	"github.com/jlevesy/kudo/pkg/generics"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -62,6 +63,17 @@ type Escalation struct {
 
 	Spec   EscalationSpec   `json:"spec"`
 	Status EscalationStatus `json:"status"`
+}
+
+func (e *Escalation) AsOwnerRef() metav1.OwnerReference {
+	return metav1.OwnerReference{
+		APIVersion:         SchemeGroupVersion.String(),
+		Kind:               KindEscalation,
+		Name:               e.Name,
+		UID:                e.UID,
+		Controller:         generics.Ptr(true),
+		BlockOwnerDeletion: generics.Ptr(true),
+	}
 }
 
 type EscalationSpec struct {
