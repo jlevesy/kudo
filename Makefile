@@ -1,4 +1,3 @@
-KO_DOCKER_REPO=ghcr.io/jlevesy/kudo
 CODE_GENERATOR_VERSION=0.24.3
 
 .PHONY: install_dependencies
@@ -32,7 +31,7 @@ debug_controller_local:
 	dlv debug ./cmd/controller -- -kubeconfig=${HOME}/.kube/config
 
 .PHONY: run_dev
-run_dev: create_cluster_dev deploy_dev create_test_user_dev deploy_environment_resources_dev
+run_dev: preflight_check_dev create_cluster_dev deploy_dev create_test_user_dev deploy_environment_resources_dev
 
 .PHONY: deploy_crds_dev
 deploy_crds_dev:
@@ -47,7 +46,7 @@ deploy_dev: deploy_crds_dev
 	helm template \
 		--values helm/values.yaml \
 		--set image.devRef=ko://github.com/jlevesy/kudo/cmd/controller \
-		kudo-dev ./helm | KO_DOCKER_REPO=$(KO_DOCKER_REPO) ko apply -B -t dev -f -
+		kudo-dev ./helm | KO_DOCKER_REPO=kudo-registry.localhost:5000 ko apply -B -t dev -f -
 
 .PHONY: logs_dev
 logs_dev:
@@ -57,6 +56,7 @@ logs_dev:
 create_cluster_dev:
 	k3d cluster create \
 		--image="rancher/k3s:v1.24.3-k3s1" \
+		--registry-create=kudo-registry.localhost:0.0.0.0:5000 \
 		kudo-dev
 
 .PHONY: delete_cluster_dev
@@ -86,3 +86,11 @@ use_admin_user_dev:
 .PHONY: use_test_user_dev
 use_test_user_dev:
 	kubectl config use-context kudo-test-user
+
+.PHONY: preflight_check_dev
+preflight_check_dev:
+	@helm version >/dev/null 2>&1 || (echo "ERROR: helm is required."; exit 1)
+	@k3d version >/dev/null 2>&1 || (echo "ERROR: k3d is required."; exit 1)
+	@kubectl version --client >/dev/null 2>&1 || (echo "ERROR: kubectl is required."; exit 1)
+	@ko version >/dev/null 2>&1 || (echo "ERROR: google/ko is required."; exit 1)
+	@grep -Fq "kudo-registry.localhost" /etc/hosts || (echo "ERROR: please add the following line `kudo-registry.localhost 127.0.0.1` to your /etc/hosts file"; exit 1)
