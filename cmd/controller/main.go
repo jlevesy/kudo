@@ -10,11 +10,13 @@ import (
 	"time"
 
 	"golang.org/x/sync/errgroup"
+	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
 
 	"github.com/jlevesy/kudo/escalation"
+	"github.com/jlevesy/kudo/granter"
 	kudov1alpha1 "github.com/jlevesy/kudo/pkg/apis/k8s.kudo.dev/v1alpha1"
 	"github.com/jlevesy/kudo/pkg/controllersupport"
 	clientset "github.com/jlevesy/kudo/pkg/generated/clientset/versioned"
@@ -23,8 +25,9 @@ import (
 )
 
 var (
-	masterURL  string
-	kubeconfig string
+	masterURL   string
+	kubeconfig  string
+	threadiness int
 
 	webhookConfig webhooksupport.ServerConfig
 )
@@ -37,6 +40,7 @@ func main() {
 	flag.StringVar(&webhookConfig.CertPath, "webhook_cert", "", "Path to webhook TLS cert")
 	flag.StringVar(&webhookConfig.KeyPath, "webhook_key", "", "Path to webhook TLS key")
 	flag.StringVar(&webhookConfig.Addr, "webhook_addr", ":8080", "Webhook listening address")
+	flag.IntVar(&threadiness, "threadiness", 10, "Amount of events processed in paralled")
 	klog.InitFlags(nil)
 
 	flag.Parse()
@@ -64,24 +68,27 @@ func main() {
 	var (
 		serveMux = http.NewServeMux()
 
+		kubeInformerFactory = kubeinformers.NewSharedInformerFactory(kubeClient, defaultInformerResyncInterval)
 		kudoInformerFactory = kudoinformers.NewSharedInformerFactory(kudoClientSet, defaultInformerResyncInterval)
 		escalationsInformer = kudoInformerFactory.K8s().V1alpha1().Escalations().Informer()
 		escalationsClient   = kudoClientSet.K8sV1alpha1().Escalations()
 		policiesLister      = kudoInformerFactory.K8s().V1alpha1().EscalationPolicies().Lister()
 
-		escalationEventsHandler = controllersupport.NewQueuedEventHandler[kudov1alpha1.Escalation](
-			escalation.NewEventHandler(
+		granterFactory = granter.DefaultGranterFactory(kubeInformerFactory, kubeClient)
+
+		escalationController = controllersupport.NewQueuedEventHandler[kudov1alpha1.Escalation](
+			escalation.NewController(
 				policiesLister,
 				escalationsClient,
-				kubeClient.RbacV1(),
+				granterFactory,
 			),
 			kudov1alpha1.KindEscalation,
-			2,
+			threadiness,
 		)
 		escalationWebhookHandler = escalation.NewWebhookHandler(policiesLister)
 	)
 
-	escalationsInformer.AddEventHandler(escalationEventsHandler)
+	escalationsInformer.AddEventHandler(escalationController)
 	serveMux.Handle("/v1alpha1/escalations", webhooksupport.MustPost(escalationWebhookHandler))
 
 	group, ctx := errgroup.WithContext(ctx)
@@ -89,16 +96,12 @@ func main() {
 	klog.Info("Starting informers...")
 
 	kudoInformerFactory.Start(ctx.Done())
+	kubeInformerFactory.Start(ctx.Done())
 
 	klog.Info("Waiting for the informers to warm up...")
 
-	syncResult := kudoInformerFactory.WaitForCacheSync(ctx.Done())
-
-	for typ, ok := range syncResult {
-		if !ok {
-			klog.Fatalf("Cache sync failed for %s, exiting", typ.String())
-		}
-	}
+	controllersupport.MustSyncInformer(kudoInformerFactory.WaitForCacheSync(ctx.Done()))
+	controllersupport.MustSyncInformer(kubeInformerFactory.WaitForCacheSync(ctx.Done()))
 
 	klog.Info("Informers warmed up, starting controller...")
 
@@ -107,7 +110,7 @@ func main() {
 	})
 
 	group.Go(func() error {
-		escalationEventsHandler.Run(ctx)
+		escalationController.Run(ctx)
 		return nil
 	})
 

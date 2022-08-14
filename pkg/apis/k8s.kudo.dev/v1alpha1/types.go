@@ -1,6 +1,7 @@
 package v1alpha1
 
 import (
+	"github.com/jlevesy/kudo/pkg/generics"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -26,7 +27,7 @@ type EscalationPolicy struct {
 type EscalationPolicySpec struct {
 	Subjects   []rbacv1.Subject      `json:"subjects"`
 	Challenges []EscalationChallenge `json:"challenges"`
-	Targets    []EscalationTarget    `json:"targets"`
+	Target     EscalationTargetSpec  `json:"target"`
 }
 
 type EscalationChallenge struct {
@@ -34,11 +35,15 @@ type EscalationChallenge struct {
 	Reviewers []rbacv1.Subject `json:"reviewers"`
 }
 
-type EscalationTarget struct {
-	Kind      string          `json:"kind"`
-	Duration  metav1.Duration `json:"duration"`
-	Namespace string          `json:"namespace"`
-	RoleRef   rbacv1.RoleRef  `json:"roleRef"`
+type EscalationTargetSpec struct {
+	Duration metav1.Duration   `json:"duration"`
+	Grants   []EscalationGrant `json:"grants"`
+}
+
+type EscalationGrant struct {
+	Kind      string         `json:"kind"`
+	Namespace string         `json:"namespace"`
+	RoleRef   rbacv1.RoleRef `json:"roleRef"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -60,6 +65,17 @@ type Escalation struct {
 	Status EscalationStatus `json:"status"`
 }
 
+func (e *Escalation) AsOwnerRef() metav1.OwnerReference {
+	return metav1.OwnerReference{
+		APIVersion:         SchemeGroupVersion.String(),
+		Kind:               KindEscalation,
+		Name:               e.Name,
+		UID:                e.UID,
+		Controller:         generics.Ptr(true),
+		BlockOwnerDeletion: generics.Ptr(true),
+	}
+}
+
 type EscalationSpec struct {
 	PolicyName string `json:"policyName"`
 	Requestor  string `json:"requestor"`
@@ -77,16 +93,24 @@ const (
 )
 
 type EscalationStatus struct {
-	State        EscalationState       `json:"state"`
-	StateDetails string                `json:"stateDetails"`
-	TargetRefs   []EscalationTargetRef `json:"targetRefs"`
+	State        EscalationState      `json:"state"`
+	StateDetails string               `json:"stateDetails"`
+	GrantRefs    []EscalationGrantRef `json:"grantRefs"`
 }
 
-type EscalationTargetRef struct {
-	Kind      string `json:"kind"`
-	Name      string `json:"name"`
-	Namespace string `json:"namespace"`
-	APIGroup  string `json:"apiGroup"`
+type GrantStatus string
+
+const (
+	GrantStatusUnknown   GrantStatus = ""
+	GrantStatusCreated   GrantStatus = "CREATED"
+	GrantStatusReclaimed GrantStatus = "RECLAIMED"
+)
+
+type EscalationGrantRef struct {
+	Kind      string      `json:"kind"`
+	Name      string      `json:"name"`
+	Namespace string      `json:"namespace"`
+	Status    GrantStatus `json:"status"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

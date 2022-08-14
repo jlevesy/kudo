@@ -41,7 +41,7 @@ spec:
                   type: string
                 stateDetails:
                   type: string
-                targetRefs:
+                grantRefs:
                   type: array
                   items:
                     type: object
@@ -52,7 +52,7 @@ spec:
                         type: string
                       namespace:
                         type: string
-                      apiGroup:
+                      status:
                         type: string
 
 status:

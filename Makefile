@@ -27,6 +27,10 @@ check_codegen: codegen
 run_controller_local:
 	go run ./cmd/controller -kubeconfig=${HOME}/.kube/config
 
+.PHONY: debug_controller_local
+debug_controller_local:
+	dlv debug ./cmd/controller -- -kubeconfig=${HOME}/.kube/config
+
 .PHONY: run_dev
 run_dev: create_cluster_dev deploy_dev create_test_user_dev deploy_environment_resources_dev
 
@@ -67,6 +71,13 @@ create_test_user_dev:
 delete_test_user_dev:
 	-kubectl config delete-user kudo-test-user
 	-kubectl config delete-context kudo-test-user
+
+.PHONY: run_escalation_dev
+run_escalation_dev: use_test_user_dev apply_escalation_dev use_admin_user_dev
+
+.PHONY: apply_escalation_dev
+apply_escalation_dev:
+	kubectl apply -f examples/escalation.yaml
 
 .PHONY: use_admin_user_dev
 use_admin_user_dev:

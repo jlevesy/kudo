@@ -60,23 +60,26 @@ spec:
                               type: string
                             namespace:
                               type: string
-                targets:
-                  type: array
-                  items:
-                    type: object
-                    properties:
-                      kind:
-                        type: string
-                      duration:
-                        type: string
-                      namespace:
-                        type: string
-                      roleRef:
+                target:
+                  type: object
+                  properties:
+                    duration:
+                      type: string
+                    grants:
+                      type: array
+                      items:
                         type: object
                         properties:
-                          apiGroup:
-                            type: string
                           kind:
                             type: string
-                          name:
+                          namespace:
                             type: string
+                          roleRef:
+                            type: object
+                            properties:
+                              apiGroup:
+                                type: string
+                              kind:
+                                type: string
+                              name:
+                                type: string
