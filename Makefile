@@ -1,4 +1,3 @@
-KO_DOCKER_REPO=ghcr.io/jlevesy/kudo
 CODE_GENERATOR_VERSION=0.24.3
 
 .PHONY: install_dependencies
@@ -47,7 +46,7 @@ deploy_dev: deploy_crds_dev
 	helm template \
 		--values helm/values.yaml \
 		--set image.devRef=ko://github.com/jlevesy/kudo/cmd/controller \
-		kudo-dev ./helm | KO_DOCKER_REPO=$(KO_DOCKER_REPO) ko apply -B -t dev -f -
+		kudo-dev ./helm | KO_DOCKER_REPO=kudo-registry.localhost:5000 ko apply -B -t dev -f -
 
 .PHONY: logs_dev
 logs_dev:
@@ -57,6 +56,7 @@ logs_dev:
 create_cluster_dev:
 	k3d cluster create \
 		--image="rancher/k3s:v1.24.3-k3s1" \
+		--registry-create=kudo-registry.localhost:0.0.0.0:5000 \
 		kudo-dev
 
 .PHONY: delete_cluster_dev
