@@ -46,7 +46,7 @@ metadata:
 subjects:
 - kind: ServiceAccount
   name: {{ include "helm.serviceAccountName" . }}
-  namespace: {{ default .Release.namespace "default" }}
+  namespace: {{ default "default" .Release.Namespace }}
 roleRef:
   kind: ClusterRole
   name: {{ include "helm.fullname" . }}-controller
