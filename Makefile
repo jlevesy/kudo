@@ -7,11 +7,11 @@ install_dependencies:
 
 .PHONY: unit_tests
 unit_tests:
-	go test -short -failfast -cover ./...
+	go test -failfast -cover $(shell go list ./... | grep -v e2e)
 
 .PHONY: e2e_tests
 e2e_tests:
-	go test -failfast ./e2e
+	go test -failfast -v ./e2e
 
 .PHONY: codegen
 codegen:
