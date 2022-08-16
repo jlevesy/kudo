@@ -90,6 +90,10 @@ func main() {
 
 	escalationsInformer.AddEventHandler(escalationController)
 	serveMux.Handle("/v1alpha1/escalations", webhooksupport.MustPost(escalationWebhookHandler))
+	serveMux.HandleFunc("/healthz", func(rw http.ResponseWriter, r *http.Request) {
+		rw.WriteHeader(http.StatusOK)
+		_, _ = rw.Write([]byte("ok"))
+	})
 
 	group, ctx := errgroup.WithContext(ctx)
 
