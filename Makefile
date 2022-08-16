@@ -9,6 +9,10 @@ install_dependencies:
 unit_tests:
 	go test -short -failfast -cover ./...
 
+.PHONY: e2e_tests
+e2e_tests:
+	go test -failfast ./e2e
+
 .PHONY: codegen
 codegen:
 	@bash ${GOPATH}/pkg/mod/k8s.io/code-generator@v$(CODE_GENERATOR_VERSION)/generate-groups.sh \
