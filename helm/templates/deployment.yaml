@@ -41,15 +41,30 @@ spec:
             - name: https
               containerPort: 443
               protocol: TCP
-          # TODO(jly): figure this out later.
-          # livenessProbe:
-          #   httpGet:
-          #     path: /
-          #     port: http
-          # readinessProbe:
-          #   httpGet:
-          #     path: /
-          #     port: http
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: https
+              scheme: HTTPS
+            failureThreshold: 10 # 50seconds to wake up, that would be good.
+            timeoutSeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: https
+              scheme: HTTPS
+            failureThreshold: 3
+            timeoutSeconds: 5
+            periodSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: https
+              scheme: HTTPS
+            failureThreshold: 3
+            timeoutSeconds: 5
+            periodSeconds: 5
           volumeMounts:
             - name: certs
               mountPath: /var/run/certs
