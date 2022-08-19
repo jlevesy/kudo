@@ -74,9 +74,10 @@ func (g *k8sRoleBindingGranter) Create(ctx context.Context, esc *kudov1alpha1.Es
 					Name: esc.Spec.Requestor,
 				},
 			},
-			RoleRef: rbacv1.RoleRef{APIGroup: rbacv1.SchemeGroupVersion.Group,
-				Kind: grant.RoleRef.Kind,
-				Name: grant.RoleRef.Name,
+			RoleRef: rbacv1.RoleRef{
+				APIGroup: rbacv1.SchemeGroupVersion.Group,
+				Kind:     grant.RoleRef.Kind,
+				Name:     grant.RoleRef.Name,
 			},
 		},
 		metav1.CreateOptions{},
@@ -155,7 +156,8 @@ func (g *k8sRoleBindingGranter) findRoleBinding(esc *kudov1alpha1.Escalation, gr
 				ref.Kind == wantRef.Kind &&
 				ref.Name == wantRef.Name &&
 				ref.UID == wantRef.UID &&
-				grant.RoleRef == binding.RoleRef {
+				grant.RoleRef.Kind == binding.RoleRef.Kind &&
+				grant.RoleRef.Name == binding.RoleRef.Name {
 				return binding, nil
 			}
 		}
