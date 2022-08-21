@@ -15,7 +15,6 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
-	"testing"
 	"time"
 
 	certificatesv1 "k8s.io/api/certificates/v1"
@@ -47,15 +46,6 @@ var (
 var (
 	debug, _ = strconv.ParseBool(os.Getenv("DEBUG"))
 )
-
-func k8sTestName(t *testing.T) string {
-	return strings.ToLower(
-		strings.ReplaceAll(
-			strings.ReplaceAll(t.Name(), "_", "-"),
-			"/", "-",
-		),
-	)
-}
 
 func dumpControllerLogs(ctx context.Context) error {
 	pods, err := admin.k8s.CoreV1().Pods(kudoInstallNamespace).List(
