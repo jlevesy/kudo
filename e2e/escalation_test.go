@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -14,83 +13,74 @@ import (
 	kudov1alpha1 "github.com/jlevesy/kudo/pkg/apis/k8s.kudo.dev/v1alpha1"
 )
 
+// TestEscalation_RoleBinding makes sure that kudo can provision two role bindings granting two different roles to
+// user-A into two different namespaces.
+// We first provision the namespaces and the roles,
+// then trigger an escalation, wait for bindings to be provisioned, and make sure we read accessed resources.
+// We then wait for expiration, make sure that  the bindings are correctly destroyed, then make sure that user-A can't access resources.
 func TestEscalation_RoleBinding(t *testing.T) {
 	t.Parallel()
 
 	var (
-		ctx       = context.Background()
-		namespace = corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: k8sTestName(t),
-			},
+		ctx        = context.Background()
+		namespaces = generateNamespaces(t, 2)
+		roles      = []rbacv1.Role{
+			generateRole(t, 0, namespaces[0].Name, rbacv1.PolicyRule{
+				Verbs:     []string{"list"},
+				APIGroups: []string{""},
+				Resources: []string{"pods"},
+			}),
+			generateRole(t, 1, namespaces[1].Name, rbacv1.PolicyRule{
+				Verbs:     []string{"list"},
+				APIGroups: []string{""},
+				Resources: []string{"configmaps"},
+			}),
 		}
-		role = rbacv1.Role{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      k8sTestName(t),
-				Namespace: namespace.Name,
-			},
-			Rules: []rbacv1.PolicyRule{
-				{
-					Verbs:     []string{"list"},
-					APIGroups: []string{""},
-					Resources: []string{"pods"},
-				},
-			},
-		}
-		policyName = "policy-" + k8sTestName(t)
-		policy     = &kudov1alpha1.EscalationPolicy{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: policyName,
-			},
-			Spec: kudov1alpha1.EscalationPolicySpec{
-				Subjects: []rbacv1.Subject{
-					{
-						Kind: rbacv1.UserKind,
-						Name: userA.userName,
+		policy = generateEscalationPolicy(
+			t,
+			withGrants(
+				kudov1alpha1.EscalationGrant{
+					Kind:      granter.K8sRoleBindingGranterKind,
+					Namespace: namespaces[0].Name,
+					RoleRef: rbacv1.RoleRef{
+						Kind: "Role",
+						Name: roles[0].Name,
 					},
 				},
-				Target: kudov1alpha1.EscalationTargetSpec{
-					Duration: metav1.Duration{Duration: 5 * time.Second},
-					Grants: []kudov1alpha1.EscalationGrant{
-						{
-							Kind:      granter.K8sRoleBindingGranterKind,
-							Namespace: namespace.Name,
-							RoleRef: rbacv1.RoleRef{
-								Kind: "Role",
-								Name: role.Name,
-							},
-						},
+				kudov1alpha1.EscalationGrant{
+					Kind:      granter.K8sRoleBindingGranterKind,
+					Namespace: namespaces[1].Name,
+					RoleRef: rbacv1.RoleRef{
+						Kind: "Role",
+						Name: roles[1].Name,
 					},
 				},
-			},
-		}
-		escalation = &kudov1alpha1.Escalation{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "escalation-" + k8sTestName(t),
-			},
-			Spec: kudov1alpha1.EscalationSpec{
-				PolicyName: policyName,
-				Reason:     "Needs moar powerrrr",
-			},
-		}
+			),
+		)
+
+		escalation = generateEscalation(t, policy.Name)
 
 		err error
 	)
 
-	_, err = admin.k8s.CoreV1().Namespaces().Create(ctx, &namespace, metav1.CreateOptions{})
+	for _, namespace := range namespaces {
+		_, err = admin.k8s.CoreV1().Namespaces().Create(ctx, &namespace, metav1.CreateOptions{})
+		require.NoError(t, err)
+	}
+
+	for i, role := range roles {
+		_, err = admin.k8s.RbacV1().Roles(namespaces[i].Name).Create(
+			ctx,
+			&role,
+			metav1.CreateOptions{},
+		)
+		require.NoError(t, err)
+	}
+
+	_, err = admin.kudo.K8sV1alpha1().EscalationPolicies().Create(ctx, &policy, metav1.CreateOptions{})
 	require.NoError(t, err)
 
-	_, err = admin.k8s.RbacV1().Roles(namespace.Name).Create(
-		ctx,
-		&role,
-		metav1.CreateOptions{},
-	)
-	require.NoError(t, err)
-
-	_, err = admin.kudo.K8sV1alpha1().EscalationPolicies().Create(ctx, policy, metav1.CreateOptions{})
-	require.NoError(t, err)
-
-	escalation, err = userA.kudo.K8sV1alpha1().Escalations().Create(ctx, escalation, metav1.CreateOptions{})
+	_, err = userA.kudo.K8sV1alpha1().Escalations().Create(ctx, &escalation, metav1.CreateOptions{})
 	require.NoError(t, err)
 
 	// admin waits for escalation to reach state ACCEPTED, and grants are created
@@ -104,29 +94,38 @@ func TestEscalation_RoleBinding(t *testing.T) {
 		},
 		condEscalationStatusMatchesSpec(
 			escalationWaitCondSpec{
-				state:         kudov1alpha1.StateAccepted,
-				grantStatuses: []kudov1alpha1.GrantStatus{kudov1alpha1.GrantStatusCreated},
+				state: kudov1alpha1.StateAccepted,
+				grantStatuses: []kudov1alpha1.GrantStatus{
+					kudov1alpha1.GrantStatusCreated,
+					kudov1alpha1.GrantStatusCreated,
+				},
 			},
 		),
 		30*time.Second,
 	)
 
-	esc := as[*kudov1alpha1.Escalation](t, rawEsc)
-	require.Len(t, esc.Status.GrantRefs, 1)
+	gotEsc := as[*kudov1alpha1.Escalation](t, rawEsc)
+	require.Len(t, gotEsc.Status.GrantRefs, 2)
 
-	assertObjectCreated(
-		t,
-		admin.k8s.RbacV1().RESTClient(),
-		resourceNameNamespace{
-			resource:  "rolebindings",
-			name:      esc.Status.GrantRefs[0].Name,
-			namespace: esc.Status.GrantRefs[0].Namespace,
-		},
-		30*time.Second,
-	)
+	for _, ref := range gotEsc.Status.GrantRefs {
+		assertObjectCreated(
+			t,
+			admin.k8s.RbacV1().RESTClient(),
+			resourceNameNamespace{
+				resource:  "rolebindings",
+				name:      ref.Name,
+				namespace: ref.Namespace,
+			},
+			30*time.Second,
+		)
+	}
 
-	// Now user should be allowed to be get the pods in the test namespace.
-	_, err = userA.k8s.CoreV1().Pods(namespace.Name).List(ctx, metav1.ListOptions{})
+	// Now user should be allowed to be get the pods in the first test namespace.
+	_, err = userA.k8s.CoreV1().Pods(namespaces[0].Name).List(ctx, metav1.ListOptions{})
+	require.NoError(t, err)
+
+	// Now user should be allowed to be get the pods in the first test namespace.
+	_, err = userA.k8s.CoreV1().ConfigMaps(namespaces[1].Name).List(ctx, metav1.ListOptions{})
 	require.NoError(t, err)
 
 	// At some point the escalation should expire.
@@ -143,24 +142,32 @@ func TestEscalation_RoleBinding(t *testing.T) {
 				state: kudov1alpha1.StateExpired,
 				grantStatuses: []kudov1alpha1.GrantStatus{
 					kudov1alpha1.GrantStatusReclaimed,
+					kudov1alpha1.GrantStatusReclaimed,
 				},
 			},
 		),
 		30*time.Second,
 	)
 
-	assertObjectDeleted(
-		t,
-		admin.k8s.RbacV1().RESTClient(),
-		resourceNameNamespace{
-			resource:  "rolebindings",
-			name:      esc.Status.GrantRefs[0].Name,
-			namespace: esc.Status.GrantRefs[0].Namespace,
-		},
-		30*time.Second,
-	)
+	// Bindings are reclaimed.
+	for _, ref := range gotEsc.Status.GrantRefs {
+		assertObjectDeleted(
+			t,
+			admin.k8s.RbacV1().RESTClient(),
+			resourceNameNamespace{
+				resource:  "rolebindings",
+				name:      ref.Name,
+				namespace: ref.Namespace,
+			},
+			30*time.Second,
+		)
+	}
 
-	// And our beloved user should get his ass kicked when listing pods again.
-	_, err = userA.k8s.CoreV1().Pods(namespace.Name).List(ctx, metav1.ListOptions{})
+	// And our beloved user should get his ass kicked when listing pods again in the first namespace.
+	_, err = userA.k8s.CoreV1().Pods(namespaces[0].Name).List(ctx, metav1.ListOptions{})
+	require.Error(t, err)
+
+	// And configmaps in the second namespace.
+	_, err = userA.k8s.CoreV1().ConfigMaps(namespaces[1].Name).List(ctx, metav1.ListOptions{})
 	require.Error(t, err)
 }
