@@ -44,14 +44,17 @@ jobs:
           go-version-file: './go.mod'
           check-latest: true
           cache: true
-      - name: Install CLI dependencies
-        run: |
-          go install helm.sh/helm/v3/cmd/helm@v3.9.3
-          helm version
-          go install github.com/google/ko@v0.11.2
-          ko version
-          go install github.com/k3d-io/k3d/v5@v5.4.4
-          k3d version
+      - name: Install google/ko
+        uses: imjasonh/setup-ko@v0.4
+      - name: Install helm
+        uses: azure/setup-helm@v3
+        with:
+          version: v3.9.3
+      - name: Install k3d
+        uses: rinx/setup-k3d@v0.0.4
+        with:
+          version: v5.4.4
+          skipClusterCreation: true
       - name: Patch /etc/hosts
         run: |
           echo "127.0.0.1 kudo-e2e-registry.localhost" | sudo tee -a /etc/hosts
