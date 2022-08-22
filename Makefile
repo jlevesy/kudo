@@ -1,4 +1,6 @@
 CODE_GENERATOR_VERSION=0.24.3
+COUNT?=1
+T?=""
 
 .PHONY: install_dependencies
 install_dependencies:
@@ -11,7 +13,7 @@ unit_tests:
 
 .PHONY: e2e_tests
 e2e_tests:
-	go test -failfast -v ./e2e
+	go test -failfast -count=$(COUNT) -run=$(T) -v ./e2e
 
 .PHONY: codegen
 codegen:
