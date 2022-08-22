@@ -2,8 +2,13 @@ package granter
 
 import (
 	"context"
+	"errors"
 
 	kudov1alpha1 "github.com/jlevesy/kudo/pkg/apis/k8s.kudo.dev/v1alpha1"
+)
+
+var (
+	ErrTampered = errors.New("kudo managed resource has been tampered with")
 )
 
 // Granter allows to create or reclaim a grant.
