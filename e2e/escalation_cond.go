@@ -1,6 +1,9 @@
 package e2e
 
 import (
+	"testing"
+	"time"
+
 	"k8s.io/apimachinery/pkg/runtime"
 
 	kudov1alpha1 "github.com/jlevesy/kudo/pkg/apis/k8s.kudo.dev/v1alpha1"
@@ -38,4 +41,34 @@ func escalationStatusMatchesSpec(want escalationWaitCondSpec, got kudov1alpha1.E
 	}
 
 	return true
+}
+
+func assertGrantedK8sResourcesCreated(t *testing.T, esc kudov1alpha1.Escalation, resource string) {
+	for _, ref := range esc.Status.GrantRefs {
+		assertObjectCreated(
+			t,
+			admin.k8s.RbacV1().RESTClient(),
+			resourceNameNamespace{
+				resource:  resource,
+				name:      ref.Name,
+				namespace: ref.Namespace,
+			},
+			30*time.Second,
+		)
+	}
+}
+
+func assertGrantedK8sResourcesDeleted(t *testing.T, esc kudov1alpha1.Escalation, resource string) {
+	for _, ref := range esc.Status.GrantRefs {
+		assertObjectDeleted(
+			t,
+			admin.k8s.RbacV1().RESTClient(),
+			resourceNameNamespace{
+				resource:  resource,
+				name:      ref.Name,
+				namespace: ref.Namespace,
+			},
+			30*time.Second,
+		)
+	}
 }

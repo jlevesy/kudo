@@ -52,6 +52,10 @@ spec:
                         type: string
                       namespace:
                         type: string
+                      uid:
+                        type: string
+                      resourceVersion:
+                        type: string
                       status:
                         type: string
 

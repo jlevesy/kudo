@@ -2,6 +2,7 @@ package escalation
 
 import (
 	"context"
+	stderrors "errors"
 	"fmt"
 	"time"
 
@@ -173,10 +174,21 @@ func (h *Controller) createGrants(ctx context.Context, esc *kudov1alpha1.Escalat
 	if err := group.Wait(); err != nil {
 		klog.ErrorS(
 			err,
-			"One or more upserts have failed",
+			"Granter reports an issue while creating",
 			"escalation",
 			esc.Name,
 		)
+
+		// If one of the granter being used reports that a kudo managed resource has been tampered with,
+		// fail the escalation and reclaim the grants.
+		if stderrors.Is(err, granter.ErrTampered) {
+			return kudov1alpha1.EscalationStatus{
+				State:        kudov1alpha1.StateDenied,
+				StateDetails: fmt.Sprintf("Escalation has been denied, reason is: %s", err.Error()),
+				GrantRefs:    esc.Status.GrantRefs,
+			}, nil
+		}
+
 		return kudov1alpha1.EscalationStatus{
 			State:        kudov1alpha1.StateAccepted,
 			StateDetails: fmt.Sprintf("Escalation is partially active, reason is: %s", err.Error()),

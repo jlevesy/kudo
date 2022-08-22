@@ -1,9 +1,11 @@
 package v1alpha1
 
 import (
-	"github.com/jlevesy/kudo/pkg/generics"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+
+	"github.com/jlevesy/kudo/pkg/generics"
 )
 
 const Version = "v1alpha1"
@@ -107,10 +109,12 @@ const (
 )
 
 type EscalationGrantRef struct {
-	Kind      string      `json:"kind"`
-	Name      string      `json:"name"`
-	Namespace string      `json:"namespace"`
-	Status    GrantStatus `json:"status"`
+	Kind            string      `json:"kind"`
+	Name            string      `json:"name"`
+	Namespace       string      `json:"namespace"`
+	UID             types.UID   `json:"uid"`
+	ResourceVersion string      `json:"resourceVersion"`
+	Status          GrantStatus `json:"status"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

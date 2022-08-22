@@ -55,6 +55,12 @@ func withGrants(grants ...kudov1alpha1.EscalationGrant) escalationPolicyOption {
 	}
 }
 
+func withExpiration(duration time.Duration) escalationPolicyOption {
+	return func(p *kudov1alpha1.EscalationPolicy) {
+		p.Spec.Target.Duration = metav1.Duration{Duration: duration}
+	}
+}
+
 func generateEscalationPolicy(t *testing.T, opts ...escalationPolicyOption) kudov1alpha1.EscalationPolicy {
 	t.Helper()
 

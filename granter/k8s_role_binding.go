@@ -2,12 +2,11 @@ package granter
 
 import (
 	"context"
+	"fmt"
 
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/selection"
 	rbacv1client "k8s.io/client-go/kubernetes/typed/rbac/v1"
 	rbacv1listers "k8s.io/client-go/listers/rbac/v1"
 	"k8s.io/klog/v2"
@@ -44,10 +43,12 @@ func (g *k8sRoleBindingGranter) Create(ctx context.Context, esc *kudov1alpha1.Es
 
 	if roleBinding != nil {
 		return kudov1alpha1.EscalationGrantRef{
-			Kind:      grant.Kind,
-			Name:      roleBinding.Name,
-			Namespace: roleBinding.Namespace,
-			Status:    kudov1alpha1.GrantStatusCreated,
+			Kind:            grant.Kind,
+			Name:            roleBinding.Name,
+			Namespace:       roleBinding.Namespace,
+			Status:          kudov1alpha1.GrantStatusCreated,
+			UID:             roleBinding.UID,
+			ResourceVersion: roleBinding.ResourceVersion,
 		}, nil
 	}
 
@@ -100,19 +101,23 @@ func (g *k8sRoleBindingGranter) Create(ctx context.Context, esc *kudov1alpha1.Es
 	)
 
 	return kudov1alpha1.EscalationGrantRef{
-		Kind:      grant.Kind,
-		Name:      roleBinding.Name,
-		Namespace: roleBinding.Namespace,
-		Status:    kudov1alpha1.GrantStatusCreated,
+		Kind:            grant.Kind,
+		Name:            roleBinding.Name,
+		Namespace:       roleBinding.Namespace,
+		Status:          kudov1alpha1.GrantStatusCreated,
+		UID:             roleBinding.UID,
+		ResourceVersion: roleBinding.ResourceVersion,
 	}, nil
 }
 
 func (g *k8sRoleBindingGranter) Reclaim(ctx context.Context, ref kudov1alpha1.EscalationGrantRef) (kudov1alpha1.EscalationGrantRef, error) {
 	status := kudov1alpha1.EscalationGrantRef{
-		Kind:      ref.Kind,
-		Name:      ref.Name,
-		Namespace: ref.Namespace,
-		Status:    kudov1alpha1.GrantStatusReclaimed,
+		Kind:            ref.Kind,
+		Name:            ref.Name,
+		Namespace:       ref.Namespace,
+		Status:          kudov1alpha1.GrantStatusReclaimed,
+		UID:             ref.UID,
+		ResourceVersion: ref.ResourceVersion,
 	}
 
 	_, err := g.roleBindingLister.RoleBindings(ref.Namespace).Get(ref.Name)
@@ -133,45 +138,47 @@ func (g *k8sRoleBindingGranter) Reclaim(ctx context.Context, ref kudov1alpha1.Es
 		return kudov1alpha1.EscalationGrantRef{}, err
 	}
 
+	klog.InfoS(
+		"Deleted a role binding",
+		"namespace",
+		ref.Namespace,
+		"roleBndingName",
+		ref.Name,
+	)
+
 	return status, nil
 }
 
 func (g *k8sRoleBindingGranter) findRoleBinding(esc *kudov1alpha1.Escalation, grant kudov1alpha1.EscalationGrant) (*rbacv1.RoleBinding, error) {
-	bindings, err := g.roleBindingLister.RoleBindings(grant.Namespace).List(g.roleBindingSelector())
-	if err != nil {
-		return nil, err
-	}
+	for _, grantRef := range esc.Status.GrantRefs {
+		if grantRef.Kind != K8sRoleBindingGranterKind || grantRef.Status != kudov1alpha1.GrantStatusCreated {
+			continue
+		}
 
-	wantRef := esc.AsOwnerRef()
+		binding, err := g.roleBindingLister.RoleBindings(grant.Namespace).Get(grantRef.Name)
+		switch {
+		case errors.IsNotFound(err):
+			continue
+		case err != nil:
+			return nil, err
+		}
 
-	for _, binding := range bindings {
-		for _, ref := range binding.OwnerReferences {
-			// To attach a created binding to a grant we:
-			// - First check that the owner reference refers to this escalation
-			// - Then make sure that the role ref matches the grant role reference.
-			// TODO(jly) there might be some case where this is failing? When we create two grants
-			// targeting the same roleRef, we'll create only one role binding, and reference the same accross two grants
-			// but heh that's a good thing?
-			if ref.APIVersion == wantRef.APIVersion &&
-				ref.Kind == wantRef.Kind &&
-				ref.Name == wantRef.Name &&
-				ref.UID == wantRef.UID &&
-				grant.RoleRef.Kind == binding.RoleRef.Kind &&
-				grant.RoleRef.Name == binding.RoleRef.Name {
-				return binding, nil
-			}
+		// Lookup for a binding, check it's UID and ResourceVersion if it has been tampered, fail the escalation.
+		if binding.UID != grantRef.UID || binding.ResourceVersion != grantRef.ResourceVersion {
+			return nil, fmt.Errorf(
+				"%w: Role binding %s in namespace %s",
+				ErrTampered,
+				binding.Name,
+				binding.Namespace,
+			)
+		}
+
+		// If the binding matches the grant we want to create the all good.
+		if binding.RoleRef.Kind == grant.RoleRef.Kind &&
+			binding.RoleRef.Name == grant.RoleRef.Name {
+			return binding, nil
 		}
 	}
 
 	return nil, nil
-}
-
-func (g *k8sRoleBindingGranter) roleBindingSelector() labels.Selector {
-	req, err := labels.NewRequirement(managedByLabel, selection.Equals, []string{defaultManagedByValue})
-	if err != nil {
-		// This is hardcoded values, should never happen.
-		panic(err)
-	}
-
-	return labels.NewSelector().Add(*req)
 }
