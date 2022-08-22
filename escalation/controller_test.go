@@ -323,6 +323,43 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 			},
 		},
 		{
+			desc:           "on accepted state, deny escalation if the granter reports that the resource has been tampered with",
+			kudoSeed:       []runtime.Object{&testPolicy},
+			upsertGrantErr: granter.ErrTampered,
+			updatedEscalation: kudov1alpha1.Escalation{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-escalation",
+					CreationTimestamp: metav1.Time{
+						Time: time.Now(),
+					},
+				},
+				Spec: kudov1alpha1.EscalationSpec{
+					PolicyName: testPolicy.Name,
+				},
+				Status: kudov1alpha1.EscalationStatus{
+					State: kudov1alpha1.StateAccepted,
+					GrantRefs: []kudov1alpha1.EscalationGrantRef{
+						{
+							Kind:   testGrantKind,
+							Name:   "grant-test-ns-1",
+							Status: kudov1alpha1.GrantStatusCreated,
+						},
+					},
+				},
+			},
+			wantEscalationStatus: kudov1alpha1.EscalationStatus{
+				State:        kudov1alpha1.StateDenied,
+				StateDetails: "Escalation has been denied, reason is: kudo managed resource has been tampered with",
+				GrantRefs: []kudov1alpha1.EscalationGrantRef{
+					{
+						Kind:   testGrantKind,
+						Name:   "grant-test-ns-1",
+						Status: kudov1alpha1.GrantStatusCreated,
+					},
+				},
+			},
+		},
+		{
 			desc:     "on expired state, reclaims all the known grants",
 			kudoSeed: []runtime.Object{&testPolicy},
 			updatedEscalation: kudov1alpha1.Escalation{
