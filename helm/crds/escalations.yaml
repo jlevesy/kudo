@@ -41,6 +41,10 @@ spec:
                   type: string
                 stateDetails:
                   type: string
+                policyUid:
+                  type: string
+                policyVersion:
+                  type: string
                 grantRefs:
                   type: array
                   items:

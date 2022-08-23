@@ -95,9 +95,11 @@ const (
 )
 
 type EscalationStatus struct {
-	State        EscalationState      `json:"state"`
-	StateDetails string               `json:"stateDetails"`
-	GrantRefs    []EscalationGrantRef `json:"grantRefs"`
+	State         EscalationState      `json:"state"`
+	StateDetails  string               `json:"stateDetails"`
+	GrantRefs     []EscalationGrantRef `json:"grantRefs"`
+	PolicyUID     types.UID            `json:"policyUid"`
+	PolicyVersion string               `json:"policyVersion"`
 }
 
 type GrantStatus string
