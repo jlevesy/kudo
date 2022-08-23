@@ -31,7 +31,9 @@ var (
 
 	testPolicy = kudov1alpha1.EscalationPolicy{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-policy",
+			Name:            "test-policy",
+			UID:             "eeee-eeee-eee",
+			ResourceVersion: "43333",
 		},
 		Spec: kudov1alpha1.EscalationPolicySpec{
 			Subjects: []rbacv1.Subject{
@@ -70,21 +72,43 @@ var (
 
 func TestEscalationController_OnCreate(t *testing.T) {
 	testCases := []struct {
-		desc string
+		desc     string
+		kudoSeed []runtime.Object
 
 		createdEscalation    kudov1alpha1.Escalation
 		wantEscalationStatus kudov1alpha1.EscalationStatus
 	}{
 		{
-			desc: "sets escalation state to pending",
+			desc: "denies escalation if policy does not exists",
 			createdEscalation: kudov1alpha1.Escalation{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-escalation",
 				},
 			},
 			wantEscalationStatus: kudov1alpha1.EscalationStatus{
-				State:        kudov1alpha1.StatePending,
-				StateDetails: escalation.PendingStateDetails,
+				State:        kudov1alpha1.StateDenied,
+				StateDetails: escalation.DeniedPolicyNotFoundStateDetails,
+			},
+		},
+		{
+			desc:     "captures policy uid and version and sets transitions to pending",
+			kudoSeed: []runtime.Object{&testPolicy},
+			createdEscalation: kudov1alpha1.Escalation{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-escalation",
+					CreationTimestamp: metav1.Time{
+						Time: time.Now(),
+					},
+				},
+				Spec: kudov1alpha1.EscalationSpec{
+					PolicyName: testPolicy.Name,
+				},
+			},
+			wantEscalationStatus: kudov1alpha1.EscalationStatus{
+				State:         kudov1alpha1.StatePending,
+				StateDetails:  escalation.PendingStateDetails,
+				PolicyUID:     testPolicy.UID,
+				PolicyVersion: testPolicy.ResourceVersion,
 			},
 		},
 	}
@@ -96,7 +120,7 @@ func TestEscalationController_OnCreate(t *testing.T) {
 				controller, k8s, done = buildController(
 					t,
 					granter.StaticFactory{},
-					[]runtime.Object{&testCase.createdEscalation},
+					append(testCase.kudoSeed, &testCase.createdEscalation),
 				)
 			)
 
@@ -160,6 +184,62 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 			},
 		},
 		{
+			desc:     "on pending state, transitions to denied if policy has changed since creation",
+			kudoSeed: []runtime.Object{&testPolicy},
+			updatedEscalation: kudov1alpha1.Escalation{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-escalation",
+					CreationTimestamp: metav1.Time{
+						Time: time.Now(),
+					},
+				},
+				Spec: kudov1alpha1.EscalationSpec{
+					PolicyName: testPolicy.Name,
+				},
+				Status: kudov1alpha1.EscalationStatus{
+					State:         kudov1alpha1.StatePending,
+					GrantRefs:     []kudov1alpha1.EscalationGrantRef{{}},
+					PolicyUID:     testPolicy.UID,
+					PolicyVersion: "3030303",
+				},
+			},
+			wantEscalationStatus: kudov1alpha1.EscalationStatus{
+				State:         kudov1alpha1.StateDenied,
+				StateDetails:  escalation.DeniedPolicyChangedStateDetails,
+				GrantRefs:     []kudov1alpha1.EscalationGrantRef{{}},
+				PolicyUID:     testPolicy.UID,
+				PolicyVersion: "3030303",
+			},
+		},
+		{
+			desc:     "on pending state, transitions to denied if policy has been recreated since creation",
+			kudoSeed: []runtime.Object{&testPolicy},
+			updatedEscalation: kudov1alpha1.Escalation{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-escalation",
+					CreationTimestamp: metav1.Time{
+						Time: time.Now(),
+					},
+				},
+				Spec: kudov1alpha1.EscalationSpec{
+					PolicyName: testPolicy.Name,
+				},
+				Status: kudov1alpha1.EscalationStatus{
+					State:         kudov1alpha1.StatePending,
+					GrantRefs:     []kudov1alpha1.EscalationGrantRef{{}},
+					PolicyUID:     "aaa-aaa-aaa",
+					PolicyVersion: testPolicy.ResourceVersion,
+				},
+			},
+			wantEscalationStatus: kudov1alpha1.EscalationStatus{
+				State:         kudov1alpha1.StateDenied,
+				StateDetails:  escalation.DeniedPolicyChangedStateDetails,
+				GrantRefs:     []kudov1alpha1.EscalationGrantRef{{}},
+				PolicyUID:     "aaa-aaa-aaa",
+				PolicyVersion: testPolicy.ResourceVersion,
+			},
+		},
+		{
 			desc:     "on pending state, transitions to expired if escalation lifetime exceeds policy duration",
 			kudoSeed: []runtime.Object{&testPolicy},
 			updatedEscalation: kudov1alpha1.Escalation{
@@ -177,7 +257,7 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 			},
 			wantEscalationStatus: kudov1alpha1.EscalationStatus{
 				State:        kudov1alpha1.StateExpired,
-				StateDetails: escalation.ExpiredWillReclaimStateDetails,
+				StateDetails: escalation.ExpiredStateDetails,
 				GrantRefs:    []kudov1alpha1.EscalationGrantRef{{}},
 			},
 		},
@@ -195,14 +275,18 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 					PolicyName: testPolicy.Name,
 				},
 				Status: kudov1alpha1.EscalationStatus{
-					State:     kudov1alpha1.StatePending,
-					GrantRefs: []kudov1alpha1.EscalationGrantRef{{}},
+					State:         kudov1alpha1.StatePending,
+					GrantRefs:     []kudov1alpha1.EscalationGrantRef{{}},
+					PolicyUID:     testPolicy.UID,
+					PolicyVersion: testPolicy.ResourceVersion,
 				},
 			},
 			wantEscalationStatus: kudov1alpha1.EscalationStatus{
-				State:        kudov1alpha1.StateAccepted,
-				StateDetails: escalation.AcceptedInProgressStateDetails,
-				GrantRefs:    []kudov1alpha1.EscalationGrantRef{{}},
+				State:         kudov1alpha1.StateAccepted,
+				StateDetails:  escalation.AcceptedInProgressStateDetails,
+				GrantRefs:     []kudov1alpha1.EscalationGrantRef{{}},
+				PolicyUID:     testPolicy.UID,
+				PolicyVersion: testPolicy.ResourceVersion,
 			},
 		},
 		{
@@ -247,10 +331,67 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 			},
 			wantEscalationStatus: kudov1alpha1.EscalationStatus{
 				State:        kudov1alpha1.StateExpired,
-				StateDetails: escalation.ExpiredWillReclaimStateDetails,
+				StateDetails: escalation.ExpiredStateDetails,
 				GrantRefs:    []kudov1alpha1.EscalationGrantRef{{}},
 			},
 		},
+		{
+			desc:     "on accepted state, transition to denied if policy has changed",
+			kudoSeed: []runtime.Object{&testPolicy},
+			updatedEscalation: kudov1alpha1.Escalation{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-escalation",
+					CreationTimestamp: metav1.Time{
+						Time: time.Now(),
+					},
+				},
+				Spec: kudov1alpha1.EscalationSpec{
+					PolicyName: testPolicy.Name,
+				},
+				Status: kudov1alpha1.EscalationStatus{
+					State:         kudov1alpha1.StateAccepted,
+					GrantRefs:     []kudov1alpha1.EscalationGrantRef{{}},
+					PolicyUID:     testPolicy.UID,
+					PolicyVersion: testPolicy.ResourceVersion + "4444",
+				},
+			},
+			wantEscalationStatus: kudov1alpha1.EscalationStatus{
+				State:         kudov1alpha1.StateDenied,
+				StateDetails:  escalation.DeniedPolicyChangedStateDetails,
+				PolicyUID:     testPolicy.UID,
+				PolicyVersion: testPolicy.ResourceVersion + "4444",
+				GrantRefs:     []kudov1alpha1.EscalationGrantRef{{}},
+			},
+		},
+		{
+			desc:     "on accepted state, transition to denied if policy has been replaced",
+			kudoSeed: []runtime.Object{&testPolicy},
+			updatedEscalation: kudov1alpha1.Escalation{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-escalation",
+					CreationTimestamp: metav1.Time{
+						Time: time.Now(),
+					},
+				},
+				Spec: kudov1alpha1.EscalationSpec{
+					PolicyName: testPolicy.Name,
+				},
+				Status: kudov1alpha1.EscalationStatus{
+					State:         kudov1alpha1.StateAccepted,
+					GrantRefs:     []kudov1alpha1.EscalationGrantRef{{}},
+					PolicyUID:     testPolicy.UID + "33333",
+					PolicyVersion: testPolicy.ResourceVersion,
+				},
+			},
+			wantEscalationStatus: kudov1alpha1.EscalationStatus{
+				State:         kudov1alpha1.StateDenied,
+				StateDetails:  escalation.DeniedPolicyChangedStateDetails,
+				PolicyUID:     testPolicy.UID + "33333",
+				PolicyVersion: testPolicy.ResourceVersion,
+				GrantRefs:     []kudov1alpha1.EscalationGrantRef{{}},
+			},
+		},
+
 		{
 			desc:     "on accepted state, provision grants if all is good",
 			kudoSeed: []runtime.Object{&testPolicy},
@@ -265,13 +406,17 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 					PolicyName: testPolicy.Name,
 				},
 				Status: kudov1alpha1.EscalationStatus{
-					State:     kudov1alpha1.StateAccepted,
-					GrantRefs: []kudov1alpha1.EscalationGrantRef{{}},
+					State:         kudov1alpha1.StateAccepted,
+					GrantRefs:     []kudov1alpha1.EscalationGrantRef{{}},
+					PolicyUID:     testPolicy.UID,
+					PolicyVersion: testPolicy.ResourceVersion,
 				},
 			},
 			wantEscalationStatus: kudov1alpha1.EscalationStatus{
-				State:        kudov1alpha1.StateAccepted,
-				StateDetails: escalation.AcceptedAppliedStateDetails,
+				State:         kudov1alpha1.StateAccepted,
+				StateDetails:  escalation.AcceptedAppliedStateDetails,
+				PolicyUID:     testPolicy.UID,
+				PolicyVersion: testPolicy.ResourceVersion,
 				GrantRefs: []kudov1alpha1.EscalationGrantRef{
 					{
 						Kind:   testGrantKind,
@@ -301,13 +446,17 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 					PolicyName: testPolicy.Name,
 				},
 				Status: kudov1alpha1.EscalationStatus{
-					State:     kudov1alpha1.StateAccepted,
-					GrantRefs: []kudov1alpha1.EscalationGrantRef{{}},
+					State:         kudov1alpha1.StateAccepted,
+					GrantRefs:     []kudov1alpha1.EscalationGrantRef{{}},
+					PolicyUID:     testPolicy.UID,
+					PolicyVersion: testPolicy.ResourceVersion,
 				},
 			},
 			wantEscalationStatus: kudov1alpha1.EscalationStatus{
-				State:        kudov1alpha1.StateAccepted,
-				StateDetails: "Escalation is partially active, reason is: not today!",
+				State:         kudov1alpha1.StateAccepted,
+				StateDetails:  "Escalation is partially active, reason is: not today!",
+				PolicyUID:     testPolicy.UID,
+				PolicyVersion: testPolicy.ResourceVersion,
 				GrantRefs: []kudov1alpha1.EscalationGrantRef{
 					{
 						Kind:   testGrantKind,
@@ -337,7 +486,9 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 					PolicyName: testPolicy.Name,
 				},
 				Status: kudov1alpha1.EscalationStatus{
-					State: kudov1alpha1.StateAccepted,
+					State:         kudov1alpha1.StateAccepted,
+					PolicyUID:     testPolicy.UID,
+					PolicyVersion: testPolicy.ResourceVersion,
 					GrantRefs: []kudov1alpha1.EscalationGrantRef{
 						{
 							Kind:   testGrantKind,
@@ -348,8 +499,10 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 				},
 			},
 			wantEscalationStatus: kudov1alpha1.EscalationStatus{
-				State:        kudov1alpha1.StateDenied,
-				StateDetails: "Escalation has been denied, reason is: kudo managed resource has been tampered with",
+				State:         kudov1alpha1.StateDenied,
+				StateDetails:  "Escalation has been denied, reason is: kudo managed resource has been tampered with",
+				PolicyUID:     testPolicy.UID,
+				PolicyVersion: testPolicy.ResourceVersion,
 				GrantRefs: []kudov1alpha1.EscalationGrantRef{
 					{
 						Kind:   testGrantKind,
@@ -373,7 +526,8 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 					PolicyName: testPolicy.Name,
 				},
 				Status: kudov1alpha1.EscalationStatus{
-					State: kudov1alpha1.StateExpired,
+					State:        kudov1alpha1.StateExpired,
+					StateDetails: "expiration has expired",
 					GrantRefs: []kudov1alpha1.EscalationGrantRef{
 						{
 							Kind:   testGrantKind,
@@ -390,7 +544,7 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 			},
 			wantEscalationStatus: kudov1alpha1.EscalationStatus{
 				State:        kudov1alpha1.StateExpired,
-				StateDetails: escalation.ExpiredReclaimedStateDetails,
+				StateDetails: "expiration has expired",
 				GrantRefs: []kudov1alpha1.EscalationGrantRef{
 					{
 						Kind:   testGrantKind,
@@ -466,7 +620,8 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 					PolicyName: testPolicy.Name,
 				},
 				Status: kudov1alpha1.EscalationStatus{
-					State: kudov1alpha1.StateDenied,
+					State:        kudov1alpha1.StateDenied,
+					StateDetails: "denied for some reason",
 					GrantRefs: []kudov1alpha1.EscalationGrantRef{
 						{
 							Kind:   testGrantKind,
@@ -483,7 +638,7 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 			},
 			wantEscalationStatus: kudov1alpha1.EscalationStatus{
 				State:        kudov1alpha1.StateDenied,
-				StateDetails: escalation.DeniedReclaimedStateDetails,
+				StateDetails: "denied for some reason",
 				GrantRefs: []kudov1alpha1.EscalationGrantRef{
 					{
 						Kind:   testGrantKind,
