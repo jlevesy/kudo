@@ -17,13 +17,11 @@ import (
 
 const (
 	PendingStateDetails              = "This escalation is being processed"
-	AcceptedInProgressStateDetails   = "This escalation has been accepted, grants are going to be applied in a few moments"
-	AcceptedAppliedStateDetails      = "This escalation has been accepted, grants are applied"
-	ExpiredWillReclaimStateDetails   = "This escalation has expired, grants are going to be reclaimed"
-	ExpiredReclaimedStateDetails     = "Escalation has expired, all grants have been reclaimed"
-	DeniedPolicyNotFoundStateDetails = "This escalation references a policy that do not exist anymore, all grants are going to be reclaimed"
-	DeniedPolicyChangedStateDetails  = "This escalation references a policy that has changed, all grants are going to be reclaimed"
-	DeniedReclaimedStateDetails      = "This escalation is denied, all grants have been reclaimed"
+	AcceptedInProgressStateDetails   = "This escalation has been accepted, permissions are going to be granted in a few moments"
+	AcceptedAppliedStateDetails      = "This escalation has been accepted, permissions are granted"
+	ExpiredStateDetails              = "This escalation has expired, all granted permissions are reclaimed"
+	DeniedPolicyNotFoundStateDetails = "This escalation references a policy that do not exist anymore, all granted permissions are reclaimed"
+	DeniedPolicyChangedStateDetails  = "This escalation references a policy that has changed, all granted permissions are reclaimed"
 )
 
 var statusZero = kudov1alpha1.EscalationStatus{}
@@ -64,7 +62,7 @@ func (h *Controller) OnAdd(ctx context.Context, escalation *kudov1alpha1.Escalat
 		escalation,
 		escalation.Status.TransitionTo(
 			kudov1alpha1.StatePending,
-			PendingStateDetails,
+			kudov1alpha1.WithDetails(PendingStateDetails),
 			kudov1alpha1.WithPolicyInfo(policy.UID, policy.ResourceVersion),
 		),
 	)
@@ -105,7 +103,7 @@ func (h *Controller) reconcileState(ctx context.Context, _, newEsc *kudov1alpha1
 		if hasPolicyChanged(newEsc, policy) {
 			return newEsc.Status.TransitionTo(
 				kudov1alpha1.StateDenied,
-				DeniedPolicyChangedStateDetails,
+				kudov1alpha1.WithDetails(DeniedPolicyChangedStateDetails),
 			), nil
 		}
 
@@ -114,7 +112,7 @@ func (h *Controller) reconcileState(ctx context.Context, _, newEsc *kudov1alpha1
 		// if ok, transition to accepted.
 		return newEsc.Status.TransitionTo(
 			kudov1alpha1.StateAccepted,
-			AcceptedInProgressStateDetails,
+			kudov1alpha1.WithDetails(AcceptedInProgressStateDetails),
 		), nil
 
 	case kudov1alpha1.StateAccepted:
@@ -129,7 +127,7 @@ func (h *Controller) reconcileState(ctx context.Context, _, newEsc *kudov1alpha1
 		if hasPolicyChanged(newEsc, policy) {
 			return newEsc.Status.TransitionTo(
 				kudov1alpha1.StateDenied,
-				DeniedPolicyChangedStateDetails,
+				kudov1alpha1.WithDetails(DeniedPolicyChangedStateDetails),
 			), nil
 		}
 
@@ -140,9 +138,11 @@ func (h *Controller) reconcileState(ctx context.Context, _, newEsc *kudov1alpha1
 		if err != nil {
 			return newEsc.Status.TransitionTo(
 				kudov1alpha1.StateExpired,
-				fmt.Sprintf(
-					"This escalation has expired, but grants have been partially reclaimed. Reason is: %s",
-					err.Error(),
+				kudov1alpha1.WithDetails(
+					fmt.Sprintf(
+						"This escalation has expired, but grants have been partially reclaimed. Reason is: %s",
+						err.Error(),
+					),
 				),
 				kudov1alpha1.WithNewGrantRefs(grantRefs),
 			), nil
@@ -150,7 +150,6 @@ func (h *Controller) reconcileState(ctx context.Context, _, newEsc *kudov1alpha1
 
 		return newEsc.Status.TransitionTo(
 			kudov1alpha1.StateExpired,
-			ExpiredReclaimedStateDetails,
 			kudov1alpha1.WithNewGrantRefs(grantRefs),
 		), nil
 
@@ -159,9 +158,11 @@ func (h *Controller) reconcileState(ctx context.Context, _, newEsc *kudov1alpha1
 		if err != nil {
 			return newEsc.Status.TransitionTo(
 				kudov1alpha1.StateDenied,
-				fmt.Sprintf(
-					"This escalation is denied, but grants have been partially reclaimed. Reason is: %s",
-					err.Error(),
+				kudov1alpha1.WithDetails(
+					fmt.Sprintf(
+						"This escalation is denied, but grants have been partially reclaimed. Reason is: %s",
+						err.Error(),
+					),
 				),
 				kudov1alpha1.WithNewGrantRefs(grantRefs),
 			), nil
@@ -169,7 +170,6 @@ func (h *Controller) reconcileState(ctx context.Context, _, newEsc *kudov1alpha1
 
 		return newEsc.Status.TransitionTo(
 			kudov1alpha1.StateDenied,
-			DeniedReclaimedStateDetails,
 			kudov1alpha1.WithNewGrantRefs(grantRefs),
 		), nil
 
@@ -212,20 +212,24 @@ func (h *Controller) createGrants(ctx context.Context, esc *kudov1alpha1.Escalat
 		if stderrors.Is(err, granter.ErrTampered) {
 			return esc.Status.TransitionTo(
 				kudov1alpha1.StateDenied,
-				fmt.Sprintf("Escalation has been denied, reason is: %s", err.Error()),
+				kudov1alpha1.WithDetails(
+					fmt.Sprintf("Escalation has been denied, reason is: %s", err.Error()),
+				),
 			), nil
 		}
 
 		return esc.Status.TransitionTo(
 			kudov1alpha1.StateAccepted,
-			fmt.Sprintf("Escalation is partially active, reason is: %s", err.Error()),
+			kudov1alpha1.WithDetails(
+				fmt.Sprintf("Escalation is partially active, reason is: %s", err.Error()),
+			),
 			kudov1alpha1.WithNewGrantRefs(grantRefs),
 		), nil
 	}
 
 	return esc.Status.TransitionTo(
 		kudov1alpha1.StateAccepted,
-		AcceptedAppliedStateDetails,
+		kudov1alpha1.WithDetails(AcceptedAppliedStateDetails),
 		kudov1alpha1.WithNewGrantRefs(grantRefs),
 	), nil
 }
@@ -273,11 +277,10 @@ func (h *Controller) readPolicyAndCheckExpiration(ctx context.Context, esc *kudo
 	switch {
 	case errors.IsNotFound(err):
 		return nil,
-			kudov1alpha1.EscalationStatus{
-				State:        kudov1alpha1.StateDenied,
-				StateDetails: DeniedPolicyNotFoundStateDetails,
-				GrantRefs:    esc.Status.GrantRefs,
-			},
+			esc.Status.TransitionTo(
+				kudov1alpha1.StateDenied,
+				kudov1alpha1.WithDetails(DeniedPolicyNotFoundStateDetails),
+			),
 			true,
 			nil
 	case err != nil:
@@ -288,11 +291,10 @@ func (h *Controller) readPolicyAndCheckExpiration(ctx context.Context, esc *kudo
 	// Is the escalation already expired? If so, transition its state and abort.
 	if now.After(esc.CreationTimestamp.Add(policy.Spec.Target.Duration.Duration)) {
 		return nil,
-			kudov1alpha1.EscalationStatus{
-				State:        kudov1alpha1.StateExpired,
-				StateDetails: ExpiredWillReclaimStateDetails,
-				GrantRefs:    esc.Status.GrantRefs,
-			},
+			esc.Status.TransitionTo(
+				kudov1alpha1.StateExpired,
+				kudov1alpha1.WithDetails(ExpiredStateDetails),
+			),
 			true,
 			nil
 	}

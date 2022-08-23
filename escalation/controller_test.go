@@ -257,7 +257,7 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 			},
 			wantEscalationStatus: kudov1alpha1.EscalationStatus{
 				State:        kudov1alpha1.StateExpired,
-				StateDetails: escalation.ExpiredWillReclaimStateDetails,
+				StateDetails: escalation.ExpiredStateDetails,
 				GrantRefs:    []kudov1alpha1.EscalationGrantRef{{}},
 			},
 		},
@@ -331,7 +331,7 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 			},
 			wantEscalationStatus: kudov1alpha1.EscalationStatus{
 				State:        kudov1alpha1.StateExpired,
-				StateDetails: escalation.ExpiredWillReclaimStateDetails,
+				StateDetails: escalation.ExpiredStateDetails,
 				GrantRefs:    []kudov1alpha1.EscalationGrantRef{{}},
 			},
 		},
@@ -526,7 +526,8 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 					PolicyName: testPolicy.Name,
 				},
 				Status: kudov1alpha1.EscalationStatus{
-					State: kudov1alpha1.StateExpired,
+					State:        kudov1alpha1.StateExpired,
+					StateDetails: "expiration has expired",
 					GrantRefs: []kudov1alpha1.EscalationGrantRef{
 						{
 							Kind:   testGrantKind,
@@ -543,7 +544,7 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 			},
 			wantEscalationStatus: kudov1alpha1.EscalationStatus{
 				State:        kudov1alpha1.StateExpired,
-				StateDetails: escalation.ExpiredReclaimedStateDetails,
+				StateDetails: "expiration has expired",
 				GrantRefs: []kudov1alpha1.EscalationGrantRef{
 					{
 						Kind:   testGrantKind,
@@ -619,7 +620,8 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 					PolicyName: testPolicy.Name,
 				},
 				Status: kudov1alpha1.EscalationStatus{
-					State: kudov1alpha1.StateDenied,
+					State:        kudov1alpha1.StateDenied,
+					StateDetails: "denied for some reason",
 					GrantRefs: []kudov1alpha1.EscalationGrantRef{
 						{
 							Kind:   testGrantKind,
@@ -636,7 +638,7 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 			},
 			wantEscalationStatus: kudov1alpha1.EscalationStatus{
 				State:        kudov1alpha1.StateDenied,
-				StateDetails: escalation.DeniedReclaimedStateDetails,
+				StateDetails: "denied for some reason",
 				GrantRefs: []kudov1alpha1.EscalationGrantRef{
 					{
 						Kind:   testGrantKind,

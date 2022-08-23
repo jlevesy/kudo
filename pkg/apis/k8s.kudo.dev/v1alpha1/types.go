@@ -104,6 +104,12 @@ type EscalationStatus struct {
 
 type TransitionMutation func(st *EscalationStatus)
 
+func WithDetails(details string) TransitionMutation {
+	return func(st *EscalationStatus) {
+		st.StateDetails = details
+	}
+}
+
 func WithNewGrantRefs(grantRefs []EscalationGrantRef) TransitionMutation {
 	return func(st *EscalationStatus) {
 		st.GrantRefs = grantRefs
@@ -117,10 +123,10 @@ func WithPolicyInfo(uid types.UID, version string) TransitionMutation {
 	}
 }
 
-func (e *EscalationStatus) TransitionTo(state EscalationState, details string, mutations ...TransitionMutation) EscalationStatus {
+func (e *EscalationStatus) TransitionTo(state EscalationState, mutations ...TransitionMutation) EscalationStatus {
 	newStatus := EscalationStatus{
 		State:         state,
-		StateDetails:  details,
+		StateDetails:  e.StateDetails,
 		GrantRefs:     e.GrantRefs,
 		PolicyUID:     e.PolicyUID,
 		PolicyVersion: e.PolicyVersion,
