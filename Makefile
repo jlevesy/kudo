@@ -37,7 +37,7 @@ debug_controller_local:
 	dlv debug ./cmd/controller -- -kubeconfig=${HOME}/.kube/config
 
 .PHONY: run_dev
-run_dev: preflight_check_dev create_cluster_dev deploy_dev create_test_user_dev deploy_environment_resources_dev
+run_dev: preflight_check_dev create_cluster_dev deploy_dev create_test_user_dev deploy_environment_resources_dev install_kubectl_escalate_plugin_dev
 
 .PHONY: deploy_crds_dev
 deploy_crds_dev:
@@ -83,7 +83,9 @@ run_escalation_dev: use_test_user_dev apply_escalation_dev use_admin_user_dev
 
 .PHONY: apply_escalation_dev
 apply_escalation_dev:
-	kubectl apply -f examples/escalation.yaml
+	kubectl kudo escalate \
+		rbac-escalation-policy-example \
+		"Needs access to squad-b namespace to debug my service"
 
 .PHONY: use_admin_user_dev
 use_admin_user_dev:
@@ -92,6 +94,10 @@ use_admin_user_dev:
 .PHONY: use_test_user_dev
 use_test_user_dev:
 	kubectl config use-context kudo-test-user
+
+.PHONY: install_kubectl_escalate_plugin_dev
+install_kubectl_escalate_plugin_dev:
+	go install ./cmd/kubectl-kudo-escalate
 
 .PHONY: preflight_check_dev
 preflight_check_dev:

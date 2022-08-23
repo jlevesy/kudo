@@ -1,8 +1,0 @@
----
-apiVersion: k8s.kudo.dev/v1alpha1
-kind: Escalation
-metadata:
-  name: escalation-example
-spec:
-  policyName: rbac-escalation-policy-example
-  reason: "Needs access to squad-b namespace to debug my service"
