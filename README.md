@@ -30,7 +30,7 @@ And this is where Kudo comes into play! This Kubernetes controller aims to;
 ## How it works?
 
 - Cluster admins define one or many `EscalationPolicy`
-- Cluster users create escalations refering a policy. `kubectl create escalation --policy=some-policy-name` (or `kubectl kudo escalate some-policy-name`)
+- Cluster users create escalations refering a policy. `kubectl kudo escalate some-policy-name some reason`)
 - This creates an Escalation object that is picked up by the kudo-controller. From there the controller:
   - Makes sure that the escalating user is allowed to use the escalation policy.
   - Run the policies `challenges` to verify at runtime that the user is allowed to perform the escalation.
