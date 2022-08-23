@@ -22,6 +22,7 @@ const (
 	ExpiredWillReclaimStateDetails   = "This escalation has expired, grants are going to be reclaimed"
 	ExpiredReclaimedStateDetails     = "Escalation has expired, all grants have been reclaimed"
 	DeniedPolicyNotFoundStateDetails = "This escalation references a policy that do not exist anymore, all grants are going to be reclaimed"
+	DeniedPolicyChangedStateDetails  = "This escalation references a policy that has changed, all grants are going to be reclaimed"
 	DeniedReclaimedStateDetails      = "This escalation is denied, all grants have been reclaimed"
 )
 
@@ -84,16 +85,28 @@ func (h *Controller) OnDelete(ctx context.Context, esc *kudov1alpha1.Escalation)
 	return nil
 }
 
-func (h *Controller) reconcileState(ctx context.Context, _, newEsc *kudov1alpha1.Escalation) (kudov1alpha1.EscalationStatus, error) {
+func hasPolicyChanged(esc *kudov1alpha1.Escalation, policy *kudov1alpha1.EscalationPolicy) bool {
+	return policy.UID != esc.Status.PolicyUID ||
+		policy.ResourceVersion != esc.Status.PolicyVersion
+}
 
+func (h *Controller) reconcileState(ctx context.Context, _, newEsc *kudov1alpha1.Escalation) (kudov1alpha1.EscalationStatus, error) {
 	switch newEsc.Status.State {
 	case kudov1alpha1.StatePending:
-		_, newStatus, updated, err := h.readPolicyAndCheckExpiration(ctx, newEsc)
+		policy, newStatus, updated, err := h.readPolicyAndCheckExpiration(ctx, newEsc)
 		if err != nil {
 			return statusZero, err
 		}
 		if updated {
 			return newStatus, nil
+		}
+
+		// Has policy changed since the escalation was created? If so, deny the escalation.
+		if hasPolicyChanged(newEsc, policy) {
+			return newEsc.Status.TransitionTo(
+				kudov1alpha1.StateDenied,
+				DeniedPolicyChangedStateDetails,
+			), nil
 		}
 
 		// Policies challenges will be evaluated here.
@@ -111,6 +124,13 @@ func (h *Controller) reconcileState(ctx context.Context, _, newEsc *kudov1alpha1
 		}
 		if updated {
 			return newStatus, nil
+		}
+
+		if hasPolicyChanged(newEsc, policy) {
+			return newEsc.Status.TransitionTo(
+				kudov1alpha1.StateDenied,
+				DeniedPolicyChangedStateDetails,
+			), nil
 		}
 
 		return h.createGrants(ctx, newEsc, policy)
