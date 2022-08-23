@@ -53,10 +53,10 @@ func (h *Controller) OnAdd(ctx context.Context, escalation *kudov1alpha1.Escalat
 	return h.updateStatus(
 		ctx,
 		escalation,
-		kudov1alpha1.EscalationStatus{
-			State:        kudov1alpha1.StatePending,
-			StateDetails: PendingStateDetails,
-		},
+		escalation.Status.TransitionTo(
+			kudov1alpha1.StatePending,
+			PendingStateDetails,
+		),
 	)
 }
 
@@ -90,11 +90,10 @@ func (h *Controller) reconcileState(ctx context.Context, _, newEsc *kudov1alpha1
 		// Policies challenges will be evaluated here.
 
 		// if ok, transition to accepted.
-		return kudov1alpha1.EscalationStatus{
-			State:        kudov1alpha1.StateAccepted,
-			StateDetails: AcceptedInProgressStateDetails,
-			GrantRefs:    newEsc.Status.GrantRefs,
-		}, nil
+		return newEsc.Status.TransitionTo(
+			kudov1alpha1.StateAccepted,
+			AcceptedInProgressStateDetails,
+		), nil
 
 	case kudov1alpha1.StateAccepted:
 		policy, newStatus, updated, err := h.readPolicyAndCheckExpiration(ctx, newEsc)
@@ -110,40 +109,40 @@ func (h *Controller) reconcileState(ctx context.Context, _, newEsc *kudov1alpha1
 	case kudov1alpha1.StateExpired:
 		grantRefs, err := h.reclaimGrants(ctx, newEsc)
 		if err != nil {
-			return kudov1alpha1.EscalationStatus{
-				State: kudov1alpha1.StateExpired,
-				StateDetails: fmt.Sprintf(
+			return newEsc.Status.TransitionTo(
+				kudov1alpha1.StateExpired,
+				fmt.Sprintf(
 					"This escalation has expired, but grants have been partially reclaimed. Reason is: %s",
 					err.Error(),
 				),
-				GrantRefs: grantRefs,
-			}, nil
+				kudov1alpha1.WithNewGrantRefs(grantRefs),
+			), nil
 		}
 
-		return kudov1alpha1.EscalationStatus{
-			State:        kudov1alpha1.StateExpired,
-			StateDetails: ExpiredReclaimedStateDetails,
-			GrantRefs:    grantRefs,
-		}, nil
+		return newEsc.Status.TransitionTo(
+			kudov1alpha1.StateExpired,
+			ExpiredReclaimedStateDetails,
+			kudov1alpha1.WithNewGrantRefs(grantRefs),
+		), nil
 
 	case kudov1alpha1.StateDenied:
 		grantRefs, err := h.reclaimGrants(ctx, newEsc)
 		if err != nil {
-			return kudov1alpha1.EscalationStatus{
-				State: kudov1alpha1.StateDenied,
-				StateDetails: fmt.Sprintf(
+			return newEsc.Status.TransitionTo(
+				kudov1alpha1.StateDenied,
+				fmt.Sprintf(
 					"This escalation is denied, but grants have been partially reclaimed. Reason is: %s",
 					err.Error(),
 				),
-				GrantRefs: grantRefs,
-			}, nil
+				kudov1alpha1.WithNewGrantRefs(grantRefs),
+			), nil
 		}
 
-		return kudov1alpha1.EscalationStatus{
-			State:        kudov1alpha1.StateDenied,
-			StateDetails: DeniedReclaimedStateDetails,
-			GrantRefs:    grantRefs,
-		}, nil
+		return newEsc.Status.TransitionTo(
+			kudov1alpha1.StateDenied,
+			DeniedReclaimedStateDetails,
+			kudov1alpha1.WithNewGrantRefs(grantRefs),
+		), nil
 
 	default:
 		return statusZero, fmt.Errorf("unsupported status %q, ignoring event", newEsc.Status.State)
@@ -182,25 +181,24 @@ func (h *Controller) createGrants(ctx context.Context, esc *kudov1alpha1.Escalat
 		// If one of the granter being used reports that a kudo managed resource has been tampered with,
 		// fail the escalation and reclaim the grants.
 		if stderrors.Is(err, granter.ErrTampered) {
-			return kudov1alpha1.EscalationStatus{
-				State:        kudov1alpha1.StateDenied,
-				StateDetails: fmt.Sprintf("Escalation has been denied, reason is: %s", err.Error()),
-				GrantRefs:    esc.Status.GrantRefs,
-			}, nil
+			return esc.Status.TransitionTo(
+				kudov1alpha1.StateDenied,
+				fmt.Sprintf("Escalation has been denied, reason is: %s", err.Error()),
+			), nil
 		}
 
-		return kudov1alpha1.EscalationStatus{
-			State:        kudov1alpha1.StateAccepted,
-			StateDetails: fmt.Sprintf("Escalation is partially active, reason is: %s", err.Error()),
-			GrantRefs:    grantRefs,
-		}, nil
+		return esc.Status.TransitionTo(
+			kudov1alpha1.StateAccepted,
+			fmt.Sprintf("Escalation is partially active, reason is: %s", err.Error()),
+			kudov1alpha1.WithNewGrantRefs(grantRefs),
+		), nil
 	}
 
-	return kudov1alpha1.EscalationStatus{
-		State:        kudov1alpha1.StateAccepted,
-		StateDetails: AcceptedAppliedStateDetails,
-		GrantRefs:    grantRefs,
-	}, nil
+	return esc.Status.TransitionTo(
+		kudov1alpha1.StateAccepted,
+		AcceptedAppliedStateDetails,
+		kudov1alpha1.WithNewGrantRefs(grantRefs),
+	), nil
 }
 
 func (h *Controller) reclaimGrants(ctx context.Context, esc *kudov1alpha1.Escalation) ([]kudov1alpha1.EscalationGrantRef, error) {

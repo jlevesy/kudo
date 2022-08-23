@@ -102,6 +102,37 @@ type EscalationStatus struct {
 	PolicyVersion string               `json:"policyVersion"`
 }
 
+type TransitionMutation func(st *EscalationStatus)
+
+func WithNewGrantRefs(grantRefs []EscalationGrantRef) TransitionMutation {
+	return func(st *EscalationStatus) {
+		st.GrantRefs = grantRefs
+	}
+}
+
+func WithPolicyInfo(uid types.UID, version string) TransitionMutation {
+	return func(st *EscalationStatus) {
+		st.PolicyUID = uid
+		st.PolicyVersion = version
+	}
+}
+
+func (e *EscalationStatus) TransitionTo(state EscalationState, details string, mutations ...TransitionMutation) EscalationStatus {
+	newStatus := EscalationStatus{
+		State:         state,
+		StateDetails:  details,
+		GrantRefs:     e.GrantRefs,
+		PolicyUID:     e.PolicyUID,
+		PolicyVersion: e.PolicyVersion,
+	}
+
+	for _, mut := range mutations {
+		mut(&newStatus)
+	}
+
+	return newStatus
+}
+
 type GrantStatus string
 
 const (
