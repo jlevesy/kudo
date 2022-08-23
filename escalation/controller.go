@@ -50,12 +50,21 @@ func NewController(
 }
 
 func (h *Controller) OnAdd(ctx context.Context, escalation *kudov1alpha1.Escalation) error {
+	policy, newStatus, updated, err := h.readPolicyAndCheckExpiration(ctx, escalation)
+	if err != nil {
+		return err
+	}
+	if updated {
+		return h.updateStatus(ctx, escalation, newStatus)
+	}
+
 	return h.updateStatus(
 		ctx,
 		escalation,
 		escalation.Status.TransitionTo(
 			kudov1alpha1.StatePending,
 			PendingStateDetails,
+			kudov1alpha1.WithPolicyInfo(policy.UID, policy.ResourceVersion),
 		),
 	)
 }

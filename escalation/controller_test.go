@@ -31,7 +31,9 @@ var (
 
 	testPolicy = kudov1alpha1.EscalationPolicy{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-policy",
+			Name:            "test-policy",
+			UID:             "eeee-eeee-eee",
+			ResourceVersion: "43333",
 		},
 		Spec: kudov1alpha1.EscalationPolicySpec{
 			Subjects: []rbacv1.Subject{
@@ -70,21 +72,43 @@ var (
 
 func TestEscalationController_OnCreate(t *testing.T) {
 	testCases := []struct {
-		desc string
+		desc     string
+		kudoSeed []runtime.Object
 
 		createdEscalation    kudov1alpha1.Escalation
 		wantEscalationStatus kudov1alpha1.EscalationStatus
 	}{
 		{
-			desc: "sets escalation state to pending",
+			desc: "denies escalation if policy does not exists",
 			createdEscalation: kudov1alpha1.Escalation{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-escalation",
 				},
 			},
 			wantEscalationStatus: kudov1alpha1.EscalationStatus{
-				State:        kudov1alpha1.StatePending,
-				StateDetails: escalation.PendingStateDetails,
+				State:        kudov1alpha1.StateDenied,
+				StateDetails: escalation.DeniedPolicyNotFoundStateDetails,
+			},
+		},
+		{
+			desc:     "captures policy uid and version and sets transitions to pending",
+			kudoSeed: []runtime.Object{&testPolicy},
+			createdEscalation: kudov1alpha1.Escalation{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-escalation",
+					CreationTimestamp: metav1.Time{
+						Time: time.Now(),
+					},
+				},
+				Spec: kudov1alpha1.EscalationSpec{
+					PolicyName: testPolicy.Name,
+				},
+			},
+			wantEscalationStatus: kudov1alpha1.EscalationStatus{
+				State:         kudov1alpha1.StatePending,
+				StateDetails:  escalation.PendingStateDetails,
+				PolicyUID:     testPolicy.UID,
+				PolicyVersion: testPolicy.ResourceVersion,
 			},
 		},
 	}
@@ -96,7 +120,7 @@ func TestEscalationController_OnCreate(t *testing.T) {
 				controller, k8s, done = buildController(
 					t,
 					granter.StaticFactory{},
-					[]runtime.Object{&testCase.createdEscalation},
+					append(testCase.kudoSeed, &testCase.createdEscalation),
 				)
 			)
 
