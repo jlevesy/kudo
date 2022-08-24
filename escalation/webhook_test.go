@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -20,6 +21,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	"github.com/jlevesy/kudo/escalation"
+	"github.com/jlevesy/kudo/grant"
 	kudov1alpha1 "github.com/jlevesy/kudo/pkg/apis/k8s.kudo.dev/v1alpha1"
 	"github.com/jlevesy/kudo/pkg/generated/clientset/versioned/fake"
 	kudoinformers "github.com/jlevesy/kudo/pkg/generated/informers/externalversions"
@@ -49,6 +51,41 @@ var (
 						Name: "user-c",
 					},
 				},
+				Target: kudov1alpha1.EscalationTargetSpec{
+					Grants: []kudov1alpha1.EscalationGrant{
+						{
+							Kind: testGrantKind,
+						},
+					},
+				},
+			},
+		},
+		&kudov1alpha1.EscalationPolicy{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       kudov1alpha1.KindEscalationPolicy,
+				APIVersion: kudov1alpha1.SchemeGroupVersion.String(),
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "policy-bad-grant-kind",
+			},
+			Spec: kudov1alpha1.EscalationPolicySpec{
+				Subjects: []rbacv1.Subject{
+					{
+						Kind: rbacv1.GroupKind,
+						Name: "group-b@org.com",
+					},
+					{
+						Kind: rbacv1.UserKind,
+						Name: "user-c",
+					},
+				},
+				Target: kudov1alpha1.EscalationTargetSpec{
+					Grants: []kudov1alpha1.EscalationGrant{
+						{
+							Kind: "nonsense",
+						},
+					},
+				},
 			},
 		},
 	}
@@ -73,6 +110,8 @@ func TestEscalationWebhookHandler_ServeHTTP(t *testing.T) {
 	testCases := []struct {
 		desc        string
 		requestBody io.Reader
+
+		grantValidateErr error
 
 		wantStatusCode int
 		wantReview     admissionv1.AdmissionReview
@@ -236,6 +275,84 @@ func TestEscalationWebhookHandler_ServeHTTP(t *testing.T) {
 			},
 		},
 		{
+			desc: "raises an error if the refered policy has an unsupported grant kind",
+			requestBody: encodeObject(
+				t,
+				admissionv1.AdmissionReview{
+					Request: &admissionv1.AdmissionRequest{
+						UID:       requestUID,
+						Kind:      escalation.ExpectedKind,
+						Operation: admissionv1.Create,
+						Object: runtime.RawExtension{
+							Raw: encodeObject(
+								t,
+								kudov1alpha1.Escalation{
+									Spec: kudov1alpha1.EscalationSpec{
+										PolicyName: "policy-bad-grant-kind",
+										Reason:     "I need moar power",
+									},
+								},
+							).Bytes(),
+						},
+						UserInfo: authenticationv1.UserInfo{
+							Username: "user-c",
+						},
+					},
+				},
+			),
+			wantStatusCode: http.StatusOK,
+			wantReview: admissionv1.AdmissionReview{
+				Response: &admissionv1.AdmissionResponse{
+					UID:     requestUID,
+					Allowed: false,
+					Result: &metav1.Status{
+						Status:  metav1.StatusFailure,
+						Message: "Policy \"policy-bad-grant-kind\" refers to an unsuported grant kind \"nonsense\"",
+					},
+				},
+			},
+		},
+
+		{
+			desc: "raises an error if the escalation is not compatible with grant",
+			requestBody: encodeObject(
+				t,
+				admissionv1.AdmissionReview{
+					Request: &admissionv1.AdmissionRequest{
+						UID:       requestUID,
+						Kind:      escalation.ExpectedKind,
+						Operation: admissionv1.Create,
+						Object: runtime.RawExtension{
+							Raw: encodeObject(
+								t,
+								kudov1alpha1.Escalation{
+									Spec: kudov1alpha1.EscalationSpec{
+										PolicyName: "policy-1",
+										Reason:     "I need moar power",
+									},
+								},
+							).Bytes(),
+						},
+						UserInfo: authenticationv1.UserInfo{
+							Username: "user-c",
+						},
+					},
+				},
+			),
+			grantValidateErr: errors.New("hahahaha"),
+			wantStatusCode:   http.StatusOK,
+			wantReview: admissionv1.AdmissionReview{
+				Response: &admissionv1.AdmissionResponse{
+					UID:     requestUID,
+					Allowed: false,
+					Result: &metav1.Status{
+						Status:  metav1.StatusFailure,
+						Message: "Escalation is impossible to grant, reason is: hahahaha",
+					},
+				},
+			},
+		},
+		{
 			desc: "allows users by username",
 			requestBody: encodeObject(
 				t,
@@ -312,15 +429,15 @@ func TestEscalationWebhookHandler_ServeHTTP(t *testing.T) {
 		},
 	}
 
-	for _, test := range testCases {
-		t.Run(test.desc, func(t *testing.T) {
+	for _, testCase := range testCases {
+		t.Run(testCase.desc, func(t *testing.T) {
 			var (
 				ctx, cancel    = context.WithTimeout(context.Background(), time.Second)
 				responseWriter = httptest.NewRecorder()
 				request        = httptest.NewRequest(
 					http.MethodPost,
 					"/v1alpha1/escalations",
-					test.requestBody,
+					testCase.requestBody,
 				)
 
 				fakeClient = fake.NewSimpleClientset(k8sStateFixtures...)
@@ -332,7 +449,18 @@ func TestEscalationWebhookHandler_ServeHTTP(t *testing.T) {
 
 				escalationPolicyInformer = informersFactories.K8s().V1alpha1().EscalationPolicies()
 
-				handler = escalation.NewWebhookHandler(escalationPolicyInformer.Lister())
+				dummyGranter = mockGranter{
+					ValidateFn: func(_ *kudov1alpha1.Escalation, _ kudov1alpha1.EscalationGrant) error {
+						return testCase.grantValidateErr
+					},
+				}
+
+				handler = escalation.NewWebhookHandler(
+					escalationPolicyInformer.Lister(),
+					grant.StaticFactory{
+						testGrantKind: injectMockGranter(&dummyGranter),
+					},
+				)
 			)
 
 			defer cancel()
@@ -345,7 +473,7 @@ func TestEscalationWebhookHandler_ServeHTTP(t *testing.T) {
 
 			handler.ServeHTTP(responseWriter, request)
 
-			assert.Equal(t, test.wantStatusCode, responseWriter.Code)
+			assert.Equal(t, testCase.wantStatusCode, responseWriter.Code)
 			assert.Equal(t, "application/json", responseWriter.Header().Get("Content-Type"))
 
 			var gotReview admissionv1.AdmissionReview
@@ -356,7 +484,7 @@ func TestEscalationWebhookHandler_ServeHTTP(t *testing.T) {
 			// We don't care about the request here, let's drop it to ease assertions.
 			gotReview.Request = nil
 
-			assert.Equal(t, test.wantReview, gotReview)
+			assert.Equal(t, testCase.wantReview, gotReview)
 		})
 	}
 }

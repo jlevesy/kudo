@@ -179,7 +179,8 @@ func TestEscalation_RoleBinding_UserAskedNamespace(t *testing.T) {
 		)
 
 		// This time the escalation is specifying a namespace.
-		escalation = generateEscalation(t, policy.Name, withNamespace(namespace.Name))
+		escalation    = generateEscalation(t, policy.Name, withNamespace(namespace.Name))
+		badEscalation = generateEscalation(t, policy.Name, withNamespace("yo-all-the-los"))
 
 		err error
 	)
@@ -196,6 +197,10 @@ func TestEscalation_RoleBinding_UserAskedNamespace(t *testing.T) {
 
 	_, err = admin.kudo.K8sV1alpha1().EscalationPolicies().Create(ctx, &policy, metav1.CreateOptions{})
 	require.NoError(t, err)
+
+	// Webhook rejects an attempt on a non authorized namespace.
+	_, err = userA.kudo.K8sV1alpha1().Escalations().Create(ctx, &badEscalation, metav1.CreateOptions{})
+	require.Error(t, err)
 
 	_, err = userA.kudo.K8sV1alpha1().Escalations().Create(ctx, &escalation, metav1.CreateOptions{})
 	require.NoError(t, err)

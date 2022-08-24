@@ -85,7 +85,7 @@ func main() {
 			kudov1alpha1.KindEscalation,
 			threadiness,
 		)
-		escalationWebhookHandler = escalation.NewWebhookHandler(policiesLister)
+		escalationWebhookHandler = escalation.NewWebhookHandler(policiesLister, granterFactory)
 	)
 
 	escalationsInformer.AddEventHandler(escalationController)
