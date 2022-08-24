@@ -16,7 +16,10 @@ spec:
     duration: 30s
     grants:
     - kind: KubernetesRoleBinding
-      namespace: some-app
+      defaultNamespace: some-app
+      allowedNamespaces:
+        - some-app
+        - some-other-app
       roleRef:
         kind: ClusterRole
         name: config-viewer

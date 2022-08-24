@@ -77,6 +77,7 @@ func runEscalate(cmd *cobra.Command, config runEscalateCfg, args []string) error
 			Spec: kudov1alpha1.EscalationSpec{
 				PolicyName: parsedArgs.policyName,
 				Reason:     parsedArgs.reason,
+				Namespace:  *config.ConfigFlags.Namespace,
 			},
 		},
 		metav1.CreateOptions{},
