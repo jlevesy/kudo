@@ -43,9 +43,12 @@ type EscalationTargetSpec struct {
 }
 
 type EscalationGrant struct {
-	Kind      string         `json:"kind"`
-	Namespace string         `json:"namespace"`
-	RoleRef   rbacv1.RoleRef `json:"roleRef"`
+	Kind string `json:"kind"`
+
+	// K8sRoleBinding configuration.
+	DefaultNamespace  string         `json:"defaultNamespace"`
+	AllowedNamespaces []string       `json:"allowedNamespaces"`
+	RoleRef           rbacv1.RoleRef `json:"roleRef"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -82,6 +85,7 @@ type EscalationSpec struct {
 	PolicyName string `json:"policyName"`
 	Requestor  string `json:"requestor"`
 	Reason     string `json:"reason"`
+	Namespace  string `json:"namespace"`
 }
 
 type EscalationState string

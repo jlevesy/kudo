@@ -1,4 +1,4 @@
-package granter
+package grant
 
 import (
 	"context"
@@ -18,4 +18,8 @@ type Granter interface {
 
 	// Reclaim reclaims a given grant.
 	Reclaim(context.Context, kudov1alpha1.EscalationGrantRef) (kudov1alpha1.EscalationGrantRef, error)
+
+	// Validate returns an error if the given escalation is not compatible with the given grant.
+	// It is used in webhook early catch configuration issues.
+	Validate(context.Context, *kudov1alpha1.Escalation, kudov1alpha1.EscalationGrant) error
 }

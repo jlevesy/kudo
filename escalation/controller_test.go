@@ -7,19 +7,19 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/jlevesy/kudo/escalation"
-	"github.com/jlevesy/kudo/granter"
+	"github.com/jlevesy/kudo/grant"
 	kudov1alpha1 "github.com/jlevesy/kudo/pkg/apis/k8s.kudo.dev/v1alpha1"
 	"github.com/jlevesy/kudo/pkg/controllersupport"
 	kudoclientset "github.com/jlevesy/kudo/pkg/generated/clientset/versioned"
 	kudofake "github.com/jlevesy/kudo/pkg/generated/clientset/versioned/fake"
 	kudoinformers "github.com/jlevesy/kudo/pkg/generated/informers/externalversions"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 const testGrantKind = "TestGrantKind"
@@ -47,8 +47,8 @@ var (
 				Duration: metav1.Duration{Duration: time.Hour},
 				Grants: []kudov1alpha1.EscalationGrant{
 					{
-						Kind:      testGrantKind,
-						Namespace: "test-ns-1",
+						Kind:             testGrantKind,
+						DefaultNamespace: "test-ns-1",
 						RoleRef: rbacv1.RoleRef{
 							APIGroup: rbacv1.GroupName,
 							Kind:     "ClusterRoleBinding",
@@ -56,8 +56,8 @@ var (
 						},
 					},
 					{
-						Kind:      testGrantKind,
-						Namespace: "test-ns-2",
+						Kind:             testGrantKind,
+						DefaultNamespace: "test-ns-2",
 						RoleRef: rbacv1.RoleRef{
 							APIGroup: rbacv1.GroupName,
 							Kind:     "ClusterRoleBinding",
@@ -119,7 +119,7 @@ func TestEscalationController_OnCreate(t *testing.T) {
 				ctx                   = context.Background()
 				controller, k8s, done = buildController(
 					t,
-					granter.StaticFactory{},
+					grant.StaticFactory{},
 					append(testCase.kudoSeed, &testCase.createdEscalation),
 				)
 			)
@@ -474,7 +474,7 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 		{
 			desc:           "on accepted state, deny escalation if the granter reports that the resource has been tampered with",
 			kudoSeed:       []runtime.Object{&testPolicy},
-			upsertGrantErr: granter.ErrTampered,
+			upsertGrantErr: grant.ErrTampered,
 			updatedEscalation: kudov1alpha1.Escalation{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-escalation",
@@ -710,7 +710,7 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 					CreateFn: func(_ *kudov1alpha1.Escalation, grant kudov1alpha1.EscalationGrant) (kudov1alpha1.EscalationGrantRef, error) {
 						return kudov1alpha1.EscalationGrantRef{
 							Kind:   testGrantKind,
-							Name:   "grant-" + grant.Namespace,
+							Name:   "grant-" + grant.DefaultNamespace,
 							Status: kudov1alpha1.GrantStatusCreated,
 						}, testCase.upsertGrantErr
 					},
@@ -725,7 +725,7 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 
 				controller, k8s, done = buildController(
 					t,
-					granter.StaticFactory{
+					grant.StaticFactory{
 						testGrantKind: injectMockGranter(&dummyGranter),
 					},
 					append(
@@ -761,13 +761,14 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 	}
 }
 
-func injectMockGranter(g *mockGranter) func() (granter.Granter, error) {
-	return func() (granter.Granter, error) { return g, nil }
+func injectMockGranter(g *mockGranter) func() (grant.Granter, error) {
+	return func() (grant.Granter, error) { return g, nil }
 }
 
 type mockGranter struct {
-	CreateFn  func(*kudov1alpha1.Escalation, kudov1alpha1.EscalationGrant) (kudov1alpha1.EscalationGrantRef, error)
-	ReclaimFn func(kudov1alpha1.EscalationGrantRef) (kudov1alpha1.EscalationGrantRef, error)
+	CreateFn   func(*kudov1alpha1.Escalation, kudov1alpha1.EscalationGrant) (kudov1alpha1.EscalationGrantRef, error)
+	ReclaimFn  func(kudov1alpha1.EscalationGrantRef) (kudov1alpha1.EscalationGrantRef, error)
+	ValidateFn func(*kudov1alpha1.Escalation, kudov1alpha1.EscalationGrant) error
 }
 
 func (g *mockGranter) Create(_ context.Context, esc *kudov1alpha1.Escalation, grant kudov1alpha1.EscalationGrant) (kudov1alpha1.EscalationGrantRef, error) {
@@ -778,6 +779,10 @@ func (g *mockGranter) Reclaim(_ context.Context, grantRef kudov1alpha1.Escalatio
 	return g.ReclaimFn(grantRef)
 }
 
+func (g *mockGranter) Validate(_ context.Context, esc *kudov1alpha1.Escalation, grant kudov1alpha1.EscalationGrant) error {
+	return g.ValidateFn(esc, grant)
+}
+
 type fakeK8s struct {
 	kudoClientSet        kudoclientset.Interface
 	kudoInformersFactory kudoinformers.SharedInformerFactory
@@ -785,7 +790,7 @@ type fakeK8s struct {
 
 type doneFunc func()
 
-func buildController(t *testing.T, granterFactory granter.Factory, kudoSeed []runtime.Object) (*escalation.Controller, fakeK8s, doneFunc) {
+func buildController(t *testing.T, granterFactory grant.Factory, kudoSeed []runtime.Object) (*escalation.Controller, fakeK8s, doneFunc) {
 	t.Helper()
 
 	var (

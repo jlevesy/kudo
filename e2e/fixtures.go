@@ -88,10 +88,18 @@ func generateEscalationPolicy(t *testing.T, opts ...escalationPolicyOption) kudo
 	return policy
 }
 
-func generateEscalation(t *testing.T, policyName string) kudov1alpha1.Escalation {
+type escalationOption func(e *kudov1alpha1.Escalation)
+
+func withNamespace(ns string) escalationOption {
+	return func(e *kudov1alpha1.Escalation) {
+		e.Spec.Namespace = ns
+	}
+}
+
+func generateEscalation(t *testing.T, policyName string, opts ...escalationOption) kudov1alpha1.Escalation {
 	t.Helper()
 
-	return kudov1alpha1.Escalation{
+	e := kudov1alpha1.Escalation{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: k8sFixtureName(t),
 		},
@@ -100,6 +108,12 @@ func generateEscalation(t *testing.T, policyName string) kudov1alpha1.Escalation
 			Reason:     "Needs moar powerrrr",
 		},
 	}
+
+	for _, opt := range opts {
+		opt(&e)
+	}
+
+	return e
 
 }
 

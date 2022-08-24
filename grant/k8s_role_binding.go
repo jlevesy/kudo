@@ -1,7 +1,8 @@
-package granter
+package grant
 
 import (
 	"context"
+	stderrors "errors"
 	"fmt"
 
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -12,15 +13,21 @@ import (
 	"k8s.io/klog/v2"
 
 	kudov1alpha1 "github.com/jlevesy/kudo/pkg/apis/k8s.kudo.dev/v1alpha1"
+	"github.com/jlevesy/kudo/pkg/generics"
 )
 
 const (
-	K8sRoleBindingGranterKind = "KubernetesRoleBinding"
+	K8sRoleBindingKind = "KubernetesRoleBinding"
 )
 
 const (
 	managedByLabel        = "app.kubernetes.io/created-by"
 	defaultManagedByValue = "kudo"
+)
+
+var (
+	ErrNamespaceNotAllowed = stderrors.New("namespace is not allowed")
+	ErrNoNamespace         = stderrors.New("no namespace could be picked")
 )
 
 type k8sRoleBindingGranter struct {
@@ -52,7 +59,12 @@ func (g *k8sRoleBindingGranter) Create(ctx context.Context, esc *kudov1alpha1.Es
 		}, nil
 	}
 
-	roleBinding, err = g.rbacClient.RoleBindings(grant.Namespace).Create(
+	ns, err := targetNamespace(esc, grant)
+	if err != nil {
+		return kudov1alpha1.EscalationGrantRef{}, err
+	}
+
+	roleBinding, err = g.rbacClient.RoleBindings(ns).Create(
 		ctx,
 		&rbacv1.RoleBinding{
 			TypeMeta: metav1.TypeMeta{
@@ -61,7 +73,7 @@ func (g *k8sRoleBindingGranter) Create(ctx context.Context, esc *kudov1alpha1.Es
 			},
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "kudo-grant-",
-				Namespace:    grant.Namespace,
+				Namespace:    ns,
 				OwnerReferences: []metav1.OwnerReference{
 					esc.AsOwnerRef(),
 				},
@@ -93,7 +105,7 @@ func (g *k8sRoleBindingGranter) Create(ctx context.Context, esc *kudov1alpha1.Es
 		"escalation",
 		esc.Name,
 		"namespace",
-		grant.Namespace,
+		ns,
 		"roleRef",
 		grant.RoleRef.Name,
 		"roleBindingName",
@@ -149,13 +161,24 @@ func (g *k8sRoleBindingGranter) Reclaim(ctx context.Context, ref kudov1alpha1.Es
 	return status, nil
 }
 
+// Validate makes sure that the target namespace is properly defined.
+func (g *k8sRoleBindingGranter) Validate(_ context.Context, esc *kudov1alpha1.Escalation, grant kudov1alpha1.EscalationGrant) error {
+	_, err := targetNamespace(esc, grant)
+	return err
+}
+
 func (g *k8sRoleBindingGranter) findRoleBinding(esc *kudov1alpha1.Escalation, grant kudov1alpha1.EscalationGrant) (*rbacv1.RoleBinding, error) {
 	for _, grantRef := range esc.Status.GrantRefs {
-		if grantRef.Kind != K8sRoleBindingGranterKind || grantRef.Status != kudov1alpha1.GrantStatusCreated {
+		if grantRef.Kind != K8sRoleBindingKind || grantRef.Status != kudov1alpha1.GrantStatusCreated {
 			continue
 		}
 
-		binding, err := g.roleBindingLister.RoleBindings(grant.Namespace).Get(grantRef.Name)
+		ns, err := targetNamespace(esc, grant)
+		if err != nil {
+			return nil, err
+		}
+
+		binding, err := g.roleBindingLister.RoleBindings(ns).Get(grantRef.Name)
 		switch {
 		case errors.IsNotFound(err):
 			continue
@@ -181,4 +204,28 @@ func (g *k8sRoleBindingGranter) findRoleBinding(esc *kudov1alpha1.Escalation, gr
 	}
 
 	return nil, nil
+}
+
+func targetNamespace(esc *kudov1alpha1.Escalation, grant kudov1alpha1.EscalationGrant) (string, error) {
+	// If we don't have a namespace specified, then see if the grant specifies a default namespace.
+	// It yes, use it, if not fail with panache.
+	if esc.Spec.Namespace == "" {
+		if grant.DefaultNamespace != "" {
+			return grant.DefaultNamespace, nil
+		}
+
+		return "", ErrNoNamespace
+	}
+
+	// Now if we're using namespace requested by the user, make sure the policy allows it.
+	if !generics.Contains(grant.AllowedNamespaces, esc.Spec.Namespace) {
+		return "", fmt.Errorf(
+			"%w namespace: %s, allowed values: %v",
+			ErrNamespaceNotAllowed,
+			esc.Spec.Namespace,
+			grant.AllowedNamespaces,
+		)
+	}
+
+	return esc.Spec.Namespace, nil
 }

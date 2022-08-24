@@ -9,7 +9,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/jlevesy/kudo/granter"
+	"github.com/jlevesy/kudo/grant"
 	kudov1alpha1 "github.com/jlevesy/kudo/pkg/apis/k8s.kudo.dev/v1alpha1"
 )
 
@@ -40,16 +40,16 @@ func TestEscalation_RoleBinding(t *testing.T) {
 			t,
 			withGrants(
 				kudov1alpha1.EscalationGrant{
-					Kind:      granter.K8sRoleBindingGranterKind,
-					Namespace: namespaces[0].Name,
+					Kind:             grant.K8sRoleBindingKind,
+					DefaultNamespace: namespaces[0].Name,
 					RoleRef: rbacv1.RoleRef{
 						Kind: "Role",
 						Name: roles[0].Name,
 					},
 				},
 				kudov1alpha1.EscalationGrant{
-					Kind:      granter.K8sRoleBindingGranterKind,
-					Namespace: namespaces[1].Name,
+					Kind:             grant.K8sRoleBindingKind,
+					DefaultNamespace: namespaces[1].Name,
 					RoleRef: rbacv1.RoleRef{
 						Kind: "Role",
 						Name: roles[1].Name,
@@ -150,6 +150,116 @@ func TestEscalation_RoleBinding(t *testing.T) {
 	require.Error(t, err)
 }
 
+// This test proves that kudo create a role binding in the namespace asked by the user if the namespace is in the allowlist.
+func TestEscalation_RoleBinding_UserAskedNamespace(t *testing.T) {
+	t.Parallel()
+
+	var (
+		ctx       = context.Background()
+		namespace = generateNamespace(t, 0)
+		role      = generateRole(t, 0, namespace.Name, rbacv1.PolicyRule{
+			Verbs:     []string{"list"},
+			APIGroups: []string{""},
+			Resources: []string{"pods"},
+		})
+		policy = generateEscalationPolicy(
+			t,
+			withGrants(
+				kudov1alpha1.EscalationGrant{
+					Kind: grant.K8sRoleBindingKind,
+					AllowedNamespaces: []string{
+						namespace.Name,
+					},
+					RoleRef: rbacv1.RoleRef{
+						Kind: "Role",
+						Name: role.Name,
+					},
+				},
+			),
+		)
+
+		// This time the escalation is specifying a namespace.
+		escalation    = generateEscalation(t, policy.Name, withNamespace(namespace.Name))
+		badEscalation = generateEscalation(t, policy.Name, withNamespace("yo-all-the-los"))
+
+		err error
+	)
+
+	_, err = admin.k8s.CoreV1().Namespaces().Create(ctx, &namespace, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	_, err = admin.k8s.RbacV1().Roles(namespace.Name).Create(
+		ctx,
+		&role,
+		metav1.CreateOptions{},
+	)
+	require.NoError(t, err)
+
+	_, err = admin.kudo.K8sV1alpha1().EscalationPolicies().Create(ctx, &policy, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	// Webhook rejects an attempt on a non authorized namespace.
+	_, err = userA.kudo.K8sV1alpha1().Escalations().Create(ctx, &badEscalation, metav1.CreateOptions{})
+	require.Error(t, err)
+
+	_, err = userA.kudo.K8sV1alpha1().Escalations().Create(ctx, &escalation, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	rawEsc := assertObjectUpdated(
+		t,
+		admin.kudo.K8sV1alpha1().RESTClient(),
+		resourceNameNamespace{
+			resource: "escalations",
+			name:     escalation.Name,
+			global:   true,
+		},
+		condEscalationStatusMatchesSpec(
+			escalationWaitCondSpec{
+				state: kudov1alpha1.StateAccepted,
+				grantStatuses: []kudov1alpha1.GrantStatus{
+					kudov1alpha1.GrantStatusCreated,
+				},
+			},
+		),
+		30*time.Second,
+	)
+
+	gotEsc := as[*kudov1alpha1.Escalation](t, rawEsc)
+
+	assertGrantedK8sResourcesCreated(t, *gotEsc, "rolebindings")
+
+	// Now user should be allowed to be get the pods in the first test namespace.
+	_, err = userA.k8s.CoreV1().Pods(namespace.Name).List(ctx, metav1.ListOptions{})
+	require.NoError(t, err)
+
+	// After a while, escalation expires.
+	assertObjectUpdated(
+		t,
+		admin.kudo.K8sV1alpha1().RESTClient(),
+		resourceNameNamespace{
+			resource: "escalations",
+			name:     escalation.Name,
+			global:   true,
+		},
+		condEscalationStatusMatchesSpec(
+			escalationWaitCondSpec{
+				state: kudov1alpha1.StateExpired,
+				grantStatuses: []kudov1alpha1.GrantStatus{
+					kudov1alpha1.GrantStatusReclaimed,
+				},
+			},
+		),
+		30*time.Second,
+	)
+
+	// Bindings are reclaimed.
+	assertGrantedK8sResourcesDeleted(t, *gotEsc, "rolebindings")
+
+	// User can't access pods anymore.
+	_, err = userA.k8s.CoreV1().Pods(namespace.Name).List(ctx, metav1.ListOptions{})
+	require.Error(t, err)
+}
+
 // This test proves that kudo deny an escalation is one tries to tamper with a rolebinding created by kudo.
 func TestEscalation_RoleBinding_DeniedIfTamperedWith(t *testing.T) {
 	t.Parallel()
@@ -167,8 +277,8 @@ func TestEscalation_RoleBinding_DeniedIfTamperedWith(t *testing.T) {
 			withExpiration(60*time.Minute), // Should not expire.
 			withGrants(
 				kudov1alpha1.EscalationGrant{
-					Kind:      granter.K8sRoleBindingGranterKind,
-					Namespace: namespace.Name,
+					Kind:             grant.K8sRoleBindingKind,
+					DefaultNamespace: namespace.Name,
 					RoleRef: rbacv1.RoleRef{
 						Kind: "Role",
 						Name: role.Name,

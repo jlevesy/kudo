@@ -72,8 +72,12 @@ spec:
                         properties:
                           kind:
                             type: string
-                          namespace:
+                          defaultNamespace:
                             type: string
+                          allowedNamespaces:
+                            type: array
+                            items:
+                              type: string
                           roleRef:
                             type: object
                             properties:

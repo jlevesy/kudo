@@ -16,7 +16,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/jlevesy/kudo/escalation"
-	"github.com/jlevesy/kudo/granter"
+	"github.com/jlevesy/kudo/grant"
 	kudov1alpha1 "github.com/jlevesy/kudo/pkg/apis/k8s.kudo.dev/v1alpha1"
 	"github.com/jlevesy/kudo/pkg/controllersupport"
 	clientset "github.com/jlevesy/kudo/pkg/generated/clientset/versioned"
@@ -74,7 +74,7 @@ func main() {
 		escalationsClient   = kudoClientSet.K8sV1alpha1().Escalations()
 		policiesLister      = kudoInformerFactory.K8s().V1alpha1().EscalationPolicies().Lister()
 
-		granterFactory = granter.DefaultGranterFactory(kubeInformerFactory, kubeClient)
+		granterFactory = grant.DefaultGranterFactory(kubeInformerFactory, kubeClient)
 
 		escalationController = controllersupport.NewQueuedEventHandler[kudov1alpha1.Escalation](
 			escalation.NewController(
@@ -85,7 +85,7 @@ func main() {
 			kudov1alpha1.KindEscalation,
 			threadiness,
 		)
-		escalationWebhookHandler = escalation.NewWebhookHandler(policiesLister)
+		escalationWebhookHandler = escalation.NewWebhookHandler(policiesLister, granterFactory)
 	)
 
 	escalationsInformer.AddEventHandler(escalationController)

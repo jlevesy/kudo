@@ -69,7 +69,10 @@ spec:
     duration: 60m
     grants:
     - kind: KubernetesRoleBinding
-      namespace: some-app
+      defaultNamespace: some-app
+      allowedNamespaces:
+        - some-app
+        - some-other-app
       roleRef:
         kind: ClusterRole
         name: some-escalated-role

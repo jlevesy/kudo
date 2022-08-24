@@ -25,3 +25,16 @@ metadata:
   namespace: some-app
 data:
   some: "data"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: some-other-app
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: game-config
+  namespace: some-other-app
+data:
+  some: "data"

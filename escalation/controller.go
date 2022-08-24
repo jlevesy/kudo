@@ -11,7 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 
-	"github.com/jlevesy/kudo/granter"
+	"github.com/jlevesy/kudo/grant"
 	kudov1alpha1 "github.com/jlevesy/kudo/pkg/apis/k8s.kudo.dev/v1alpha1"
 )
 
@@ -33,13 +33,13 @@ type EscalationStatusUpdater interface {
 type Controller struct {
 	policiesGetter          EscalationPoliciesGetter
 	escalationStatusUpdater EscalationStatusUpdater
-	granterFactory          granter.Factory
+	granterFactory          grant.Factory
 }
 
 func NewController(
 	policiesGetter EscalationPoliciesGetter,
 	escalationStatusUpdater EscalationStatusUpdater,
-	granterFactory granter.Factory,
+	granterFactory grant.Factory,
 ) *Controller {
 	return &Controller{
 		policiesGetter:          policiesGetter,
@@ -209,7 +209,7 @@ func (h *Controller) createGrants(ctx context.Context, esc *kudov1alpha1.Escalat
 
 		// If one of the granter being used reports that a kudo managed resource has been tampered with,
 		// fail the escalation and reclaim the grants.
-		if stderrors.Is(err, granter.ErrTampered) {
+		if stderrors.Is(err, grant.ErrTampered) {
 			return esc.Status.TransitionTo(
 				kudov1alpha1.StateDenied,
 				kudov1alpha1.WithDetails(

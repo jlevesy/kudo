@@ -13,6 +13,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 
+	"github.com/jlevesy/kudo/grant"
 	kudo "github.com/jlevesy/kudo/pkg/apis/k8s.kudo.dev"
 	"github.com/jlevesy/kudo/pkg/apis/k8s.kudo.dev/v1alpha1"
 	kudov1alpha1 "github.com/jlevesy/kudo/pkg/apis/k8s.kudo.dev/v1alpha1"
@@ -39,10 +40,11 @@ type EscalationPoliciesGetter interface {
 
 type WebhookHandler struct {
 	policiesGetter EscalationPoliciesGetter
+	grantFactory   grant.Factory
 }
 
-func NewWebhookHandler(g EscalationPoliciesGetter) *WebhookHandler {
-	return &WebhookHandler{policiesGetter: g}
+func NewWebhookHandler(g EscalationPoliciesGetter, f grant.Factory) *WebhookHandler {
+	return &WebhookHandler{policiesGetter: g, grantFactory: f}
 }
 
 func (h *WebhookHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
@@ -176,6 +178,53 @@ func (h *WebhookHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	for _, grant := range policy.Spec.Target.Grants {
+		granter, err := h.grantFactory.Get(grant.Kind)
+		if err != nil {
+			klog.InfoS(
+				"Refered escalation policy has a grant that is not supported",
+				usernameAndPolicyTags(
+					review.Request.UserInfo.Username,
+					policy.Name,
+				)...,
+			)
+
+			review.Response.Result = &metav1.Status{
+				Status: metav1.StatusFailure,
+				Message: fmt.Sprintf(
+					"Policy %q refers to an unsuported grant kind %q",
+					policy.Name,
+					grant.Kind,
+				),
+			}
+
+			webhooksupport.WriteJSON(rw, http.StatusOK, &review)
+			return
+		}
+
+		if err = granter.Validate(r.Context(), &escalation, grant); err != nil {
+			klog.ErrorS(
+				err,
+				"User submitted an invalid escalation",
+				usernameAndPolicyTags(
+					review.Request.UserInfo.Username,
+					policy.Name,
+				),
+			)
+
+			review.Response.Result = &metav1.Status{
+				Status: metav1.StatusFailure,
+				Message: fmt.Sprintf(
+					"Escalation is impossible to grant, reason is: %s",
+					err,
+				),
+			}
+
+			webhooksupport.WriteJSON(rw, http.StatusOK, &review)
+			return
+		}
+	}
+
 	if review.Response.Patch, err = genObjectPatch(review.Request.UserInfo); err != nil {
 		klog.ErrorS(
 			err,
@@ -246,11 +295,14 @@ func genObjectPatch(user authenticationv1.UserInfo) ([]byte, error) {
 	return json.Marshal(&patch)
 }
 
-func usernameAndPolicyTags(username, policy string) []any {
-	return []any{
-		"username",
-		username,
-		"policy",
-		policy,
-	}
+func usernameAndPolicyTags(username, policy string, anything ...any) []any {
+	return append(
+		[]any{
+			"username",
+			username,
+			"policy",
+			policy,
+		},
+		anything...,
+	)
 }
