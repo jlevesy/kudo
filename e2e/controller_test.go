@@ -31,8 +31,8 @@ func TestEscalation_Controller_DenyEscalationIfPolicyChanges(t *testing.T) {
 			withExpiration(60*time.Minute), // Should not expire.
 			withGrants(
 				kudov1alpha1.EscalationGrant{
-					Kind:      grant.K8sRoleBindingKind,
-					Namespace: namespace.Name,
+					Kind:              grant.K8sRoleBindingKind,
+					AllowedNamespaces: []string{namespace.Name},
 					RoleRef: rbacv1.RoleRef{
 						Kind: "Role",
 						Name: role.Name,
@@ -41,7 +41,7 @@ func TestEscalation_Controller_DenyEscalationIfPolicyChanges(t *testing.T) {
 			),
 		)
 
-		escalation = generateEscalation(t, policy.Name)
+		escalation = generateEscalation(t, policy.Name, withNamespace(namespace.Name))
 
 		err error
 	)
@@ -88,8 +88,8 @@ func TestEscalation_Controller_DenyEscalationIfPolicyChanges(t *testing.T) {
 	gotPolicy.Spec.Target.Grants = append(
 		policy.Spec.Target.Grants,
 		kudov1alpha1.EscalationGrant{
-			Kind:      grant.K8sRoleBindingKind,
-			Namespace: "foo",
+			Kind:             grant.K8sRoleBindingKind,
+			DefaultNamespace: "foo",
 			RoleRef: rbacv1.RoleRef{
 				Kind: "ClusterRole",
 				Name: "some-other-role",

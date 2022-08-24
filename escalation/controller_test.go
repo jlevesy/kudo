@@ -47,8 +47,8 @@ var (
 				Duration: metav1.Duration{Duration: time.Hour},
 				Grants: []kudov1alpha1.EscalationGrant{
 					{
-						Kind:      testGrantKind,
-						Namespace: "test-ns-1",
+						Kind:             testGrantKind,
+						DefaultNamespace: "test-ns-1",
 						RoleRef: rbacv1.RoleRef{
 							APIGroup: rbacv1.GroupName,
 							Kind:     "ClusterRoleBinding",
@@ -56,8 +56,8 @@ var (
 						},
 					},
 					{
-						Kind:      testGrantKind,
-						Namespace: "test-ns-2",
+						Kind:             testGrantKind,
+						DefaultNamespace: "test-ns-2",
 						RoleRef: rbacv1.RoleRef{
 							APIGroup: rbacv1.GroupName,
 							Kind:     "ClusterRoleBinding",
@@ -710,7 +710,7 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 					CreateFn: func(_ *kudov1alpha1.Escalation, grant kudov1alpha1.EscalationGrant) (kudov1alpha1.EscalationGrantRef, error) {
 						return kudov1alpha1.EscalationGrantRef{
 							Kind:   testGrantKind,
-							Name:   "grant-" + grant.Namespace,
+							Name:   "grant-" + grant.DefaultNamespace,
 							Status: kudov1alpha1.GrantStatusCreated,
 						}, testCase.upsertGrantErr
 					},
