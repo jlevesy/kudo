@@ -766,8 +766,9 @@ func injectMockGranter(g *mockGranter) func() (grant.Granter, error) {
 }
 
 type mockGranter struct {
-	CreateFn  func(*kudov1alpha1.Escalation, kudov1alpha1.EscalationGrant) (kudov1alpha1.EscalationGrantRef, error)
-	ReclaimFn func(kudov1alpha1.EscalationGrantRef) (kudov1alpha1.EscalationGrantRef, error)
+	CreateFn   func(*kudov1alpha1.Escalation, kudov1alpha1.EscalationGrant) (kudov1alpha1.EscalationGrantRef, error)
+	ReclaimFn  func(kudov1alpha1.EscalationGrantRef) (kudov1alpha1.EscalationGrantRef, error)
+	ValidateFn func(*kudov1alpha1.Escalation, kudov1alpha1.EscalationGrant) error
 }
 
 func (g *mockGranter) Create(_ context.Context, esc *kudov1alpha1.Escalation, grant kudov1alpha1.EscalationGrant) (kudov1alpha1.EscalationGrantRef, error) {
@@ -776,6 +777,10 @@ func (g *mockGranter) Create(_ context.Context, esc *kudov1alpha1.Escalation, gr
 
 func (g *mockGranter) Reclaim(_ context.Context, grantRef kudov1alpha1.EscalationGrantRef) (kudov1alpha1.EscalationGrantRef, error) {
 	return g.ReclaimFn(grantRef)
+}
+
+func (g *mockGranter) Validate(_ context.Context, esc *kudov1alpha1.Escalation, grant kudov1alpha1.EscalationGrant) error {
+	return g.ValidateFn(esc, grant)
 }
 
 type fakeK8s struct {

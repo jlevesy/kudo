@@ -454,6 +454,80 @@ func TestK8sRoleBindingGranter_Reclaim(t *testing.T) {
 	}
 }
 
+func TestK8sRoleBindingGranter_Validate(t *testing.T) {
+	testCases := []struct {
+		desc       string
+		grant      kudov1alpha1.EscalationGrant
+		escalation kudov1alpha1.Escalation
+		wantError  error
+	}{
+		{
+			desc:       "raises an error if no namespace could be picked",
+			grant:      kudov1alpha1.EscalationGrant{},
+			escalation: kudov1alpha1.Escalation{},
+			wantError:  grant.ErrNoNamespace,
+		},
+		{
+			desc: "raises an error if requestor namespace is not in grant allow list",
+			grant: kudov1alpha1.EscalationGrant{
+				AllowedNamespaces: []string{
+					"ns-a",
+				},
+			},
+			escalation: kudov1alpha1.Escalation{
+				Spec: kudov1alpha1.EscalationSpec{
+					Namespace: "ns-b",
+				},
+			},
+			wantError: grant.ErrNamespaceNotAllowed,
+		},
+		{
+			desc: "raises no error if default namespace is picked",
+			grant: kudov1alpha1.EscalationGrant{
+				DefaultNamespace: "ns-c",
+				AllowedNamespaces: []string{
+					"ns-a",
+				},
+			},
+			escalation: kudov1alpha1.Escalation{
+				Spec: kudov1alpha1.EscalationSpec{
+					Namespace: "",
+				},
+			},
+		},
+		{
+			desc: "raises no error if requestor namespace is allowed",
+			grant: kudov1alpha1.EscalationGrant{
+				AllowedNamespaces: []string{
+					"ns-a",
+				},
+			},
+			escalation: kudov1alpha1.Escalation{
+				Spec: kudov1alpha1.EscalationSpec{
+					Namespace: "ns-a",
+				},
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.desc, func(t *testing.T) {
+			var (
+				ctx                = context.Background()
+				factory, _, cancel = buildTestFactory(t, nil)
+			)
+
+			defer cancel()
+
+			granter, err := factory.Get(grant.K8sRoleBindingKind)
+			require.NoError(t, err)
+
+			err = granter.Validate(ctx, &testCase.escalation, testCase.grant)
+			assert.ErrorIs(t, err, testCase.wantError)
+		})
+	}
+}
+
 type fakeK8s struct {
 	kubeClientSet        kubernetes.Interface
 	kubeInformersFactory kubeinformers.SharedInformerFactory

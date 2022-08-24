@@ -161,6 +161,12 @@ func (g *k8sRoleBindingGranter) Reclaim(ctx context.Context, ref kudov1alpha1.Es
 	return status, nil
 }
 
+// Validate makes sure that the target namespace is properly defined.
+func (g *k8sRoleBindingGranter) Validate(_ context.Context, esc *kudov1alpha1.Escalation, grant kudov1alpha1.EscalationGrant) error {
+	_, err := targetNamespace(esc, grant)
+	return err
+}
+
 func (g *k8sRoleBindingGranter) findRoleBinding(esc *kudov1alpha1.Escalation, grant kudov1alpha1.EscalationGrant) (*rbacv1.RoleBinding, error) {
 	for _, grantRef := range esc.Status.GrantRefs {
 		if grantRef.Kind != K8sRoleBindingKind || grantRef.Status != kudov1alpha1.GrantStatusCreated {
