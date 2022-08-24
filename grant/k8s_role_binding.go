@@ -52,7 +52,9 @@ func (g *k8sRoleBindingGranter) Create(ctx context.Context, esc *kudov1alpha1.Es
 		}, nil
 	}
 
-	roleBinding, err = g.rbacClient.RoleBindings(grant.Namespace).Create(
+	ns := targetNamespace(esc, grant)
+
+	roleBinding, err = g.rbacClient.RoleBindings(ns).Create(
 		ctx,
 		&rbacv1.RoleBinding{
 			TypeMeta: metav1.TypeMeta{
@@ -61,7 +63,7 @@ func (g *k8sRoleBindingGranter) Create(ctx context.Context, esc *kudov1alpha1.Es
 			},
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "kudo-grant-",
-				Namespace:    grant.Namespace,
+				Namespace:    ns,
 				OwnerReferences: []metav1.OwnerReference{
 					esc.AsOwnerRef(),
 				},
@@ -93,7 +95,7 @@ func (g *k8sRoleBindingGranter) Create(ctx context.Context, esc *kudov1alpha1.Es
 		"escalation",
 		esc.Name,
 		"namespace",
-		grant.Namespace,
+		ns,
 		"roleRef",
 		grant.RoleRef.Name,
 		"roleBindingName",
@@ -155,7 +157,7 @@ func (g *k8sRoleBindingGranter) findRoleBinding(esc *kudov1alpha1.Escalation, gr
 			continue
 		}
 
-		binding, err := g.roleBindingLister.RoleBindings(grant.Namespace).Get(grantRef.Name)
+		binding, err := g.roleBindingLister.RoleBindings(targetNamespace(esc, grant)).Get(grantRef.Name)
 		switch {
 		case errors.IsNotFound(err):
 			continue
@@ -181,4 +183,12 @@ func (g *k8sRoleBindingGranter) findRoleBinding(esc *kudov1alpha1.Escalation, gr
 	}
 
 	return nil, nil
+}
+
+func targetNamespace(esc *kudov1alpha1.Escalation, grant kudov1alpha1.EscalationGrant) string {
+	if esc.Spec.Namespace != "" {
+		return esc.Spec.Namespace
+	}
+
+	return grant.DefaultNamespace
 }
