@@ -5,11 +5,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jlevesy/kudo/granter"
-	kudov1alpha1 "github.com/jlevesy/kudo/pkg/apis/k8s.kudo.dev/v1alpha1"
 	"github.com/stretchr/testify/require"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/jlevesy/kudo/grant"
+	kudov1alpha1 "github.com/jlevesy/kudo/pkg/apis/k8s.kudo.dev/v1alpha1"
 )
 
 // This test makes sure that kudo denies an active escalation whose policy has changed after the escalation
@@ -30,7 +31,7 @@ func TestEscalation_Controller_DenyEscalationIfPolicyChanges(t *testing.T) {
 			withExpiration(60*time.Minute), // Should not expire.
 			withGrants(
 				kudov1alpha1.EscalationGrant{
-					Kind:      granter.K8sRoleBindingGranterKind,
+					Kind:      grant.K8sRoleBindingKind,
 					Namespace: namespace.Name,
 					RoleRef: rbacv1.RoleRef{
 						Kind: "Role",
@@ -87,7 +88,7 @@ func TestEscalation_Controller_DenyEscalationIfPolicyChanges(t *testing.T) {
 	gotPolicy.Spec.Target.Grants = append(
 		policy.Spec.Target.Grants,
 		kudov1alpha1.EscalationGrant{
-			Kind:      granter.K8sRoleBindingGranterKind,
+			Kind:      grant.K8sRoleBindingKind,
 			Namespace: "foo",
 			RoleRef: rbacv1.RoleRef{
 				Kind: "ClusterRole",

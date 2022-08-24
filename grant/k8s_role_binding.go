@@ -1,4 +1,4 @@
-package granter
+package grant
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	K8sRoleBindingGranterKind = "KubernetesRoleBinding"
+	K8sRoleBindingKind = "KubernetesRoleBinding"
 )
 
 const (
@@ -151,7 +151,7 @@ func (g *k8sRoleBindingGranter) Reclaim(ctx context.Context, ref kudov1alpha1.Es
 
 func (g *k8sRoleBindingGranter) findRoleBinding(esc *kudov1alpha1.Escalation, grant kudov1alpha1.EscalationGrant) (*rbacv1.RoleBinding, error) {
 	for _, grantRef := range esc.Status.GrantRefs {
-		if grantRef.Kind != K8sRoleBindingGranterKind || grantRef.Status != kudov1alpha1.GrantStatusCreated {
+		if grantRef.Kind != K8sRoleBindingKind || grantRef.Status != kudov1alpha1.GrantStatusCreated {
 			continue
 		}
 

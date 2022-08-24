@@ -1,4 +1,4 @@
-package granter
+package grant
 
 import (
 	kubeinformers "k8s.io/client-go/informers"
@@ -15,7 +15,7 @@ func DefaultGranterFactory(
 		roleBindingLister = kubeInformerFactory.Rbac().V1().RoleBindings().Lister()
 	)
 
-	factory[K8sRoleBindingGranterKind] = func() (Granter, error) {
+	factory[K8sRoleBindingKind] = func() (Granter, error) {
 		return newK8sRoleBindingGranter(
 			kubeClient.RbacV1(),
 			roleBindingLister,

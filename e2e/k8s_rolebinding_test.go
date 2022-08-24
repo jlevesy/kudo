@@ -9,7 +9,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/jlevesy/kudo/granter"
+	"github.com/jlevesy/kudo/grant"
 	kudov1alpha1 "github.com/jlevesy/kudo/pkg/apis/k8s.kudo.dev/v1alpha1"
 )
 
@@ -40,7 +40,7 @@ func TestEscalation_RoleBinding(t *testing.T) {
 			t,
 			withGrants(
 				kudov1alpha1.EscalationGrant{
-					Kind:      granter.K8sRoleBindingGranterKind,
+					Kind:      grant.K8sRoleBindingKind,
 					Namespace: namespaces[0].Name,
 					RoleRef: rbacv1.RoleRef{
 						Kind: "Role",
@@ -48,7 +48,7 @@ func TestEscalation_RoleBinding(t *testing.T) {
 					},
 				},
 				kudov1alpha1.EscalationGrant{
-					Kind:      granter.K8sRoleBindingGranterKind,
+					Kind:      grant.K8sRoleBindingKind,
 					Namespace: namespaces[1].Name,
 					RoleRef: rbacv1.RoleRef{
 						Kind: "Role",
@@ -167,7 +167,7 @@ func TestEscalation_RoleBinding_DeniedIfTamperedWith(t *testing.T) {
 			withExpiration(60*time.Minute), // Should not expire.
 			withGrants(
 				kudov1alpha1.EscalationGrant{
-					Kind:      granter.K8sRoleBindingGranterKind,
+					Kind:      grant.K8sRoleBindingKind,
 					Namespace: namespace.Name,
 					RoleRef: rbacv1.RoleRef{
 						Kind: "Role",

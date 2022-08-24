@@ -1,4 +1,4 @@
-package granter
+package grant
 
 import (
 	"context"

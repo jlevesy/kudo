@@ -1,4 +1,4 @@
-package granter_test
+package grant_test
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 
-	"github.com/jlevesy/kudo/granter"
+	"github.com/jlevesy/kudo/grant"
 	kudov1alpha1 "github.com/jlevesy/kudo/pkg/apis/k8s.kudo.dev/v1alpha1"
 	"github.com/jlevesy/kudo/pkg/controllersupport"
 )
@@ -46,7 +46,7 @@ var (
 			State: kudov1alpha1.StateAccepted,
 			GrantRefs: []kudov1alpha1.EscalationGrantRef{
 				{
-					Kind:            granter.K8sRoleBindingGranterKind,
+					Kind:            grant.K8sRoleBindingKind,
 					Name:            "",
 					Namespace:       "test-ns",
 					Status:          kudov1alpha1.GrantStatusCreated,
@@ -69,7 +69,7 @@ var (
 			State: kudov1alpha1.StateAccepted,
 			GrantRefs: []kudov1alpha1.EscalationGrantRef{
 				{
-					Kind:      granter.K8sRoleBindingGranterKind,
+					Kind:      grant.K8sRoleBindingKind,
 					Name:      "",
 					Namespace: "test-ns",
 					Status:    kudov1alpha1.GrantStatusCreated,
@@ -82,7 +82,7 @@ var (
 	}
 
 	testGrant = kudov1alpha1.EscalationGrant{
-		Kind:      granter.K8sRoleBindingGranterKind,
+		Kind:      grant.K8sRoleBindingKind,
 		Namespace: "test-ns",
 		RoleRef: rbacv1.RoleRef{
 			APIGroup: rbacv1.GroupName,
@@ -197,7 +197,7 @@ func TestK8sRoleBindingGranter_Create(t *testing.T) {
 			escalation: testEscalation,
 			grant:      testGrant,
 			wantRef: kudov1alpha1.EscalationGrantRef{
-				Kind:      granter.K8sRoleBindingGranterKind,
+				Kind:      grant.K8sRoleBindingKind,
 				Name:      "", // testclient does not handle generate name.
 				Namespace: "test-ns",
 				Status:    kudov1alpha1.GrantStatusCreated,
@@ -212,7 +212,7 @@ func TestK8sRoleBindingGranter_Create(t *testing.T) {
 			escalation: testEscalationAlreadyExistingBinding,
 			grant:      testGrant,
 			wantRef: kudov1alpha1.EscalationGrantRef{
-				Kind:            granter.K8sRoleBindingGranterKind,
+				Kind:            grant.K8sRoleBindingKind,
 				Name:            "", // testclient does not handle generate name.
 				Namespace:       "test-ns",
 				Status:          kudov1alpha1.GrantStatusCreated,
@@ -229,7 +229,7 @@ func TestK8sRoleBindingGranter_Create(t *testing.T) {
 			escalation:      testEscalationAlreadyExistingBindingTampered,
 			grant:           testGrant,
 			wantRef:         kudov1alpha1.EscalationGrantRef{},
-			wantCreateError: granter.ErrTampered,
+			wantCreateError: grant.ErrTampered,
 			wantBindings: rbacv1.RoleBindingList{
 				Items: []rbacv1.RoleBinding{existingBinding, otherBinding},
 			},
@@ -245,7 +245,7 @@ func TestK8sRoleBindingGranter_Create(t *testing.T) {
 
 			defer cancel()
 
-			granter, err := factory.Get(granter.K8sRoleBindingGranterKind)
+			granter, err := factory.Get(grant.K8sRoleBindingKind)
 			require.NoError(t, err)
 
 			gotRef, err := granter.Create(ctx, &testCase.escalation, testCase.grant)
@@ -280,12 +280,12 @@ func TestK8sRoleBindingGranter_Reclaim(t *testing.T) {
 			desc: "deletes the role binding if it exists",
 			seed: []runtime.Object{&existingBinding, &otherBinding},
 			grantRef: kudov1alpha1.EscalationGrantRef{
-				Kind:      granter.K8sRoleBindingGranterKind,
+				Kind:      grant.K8sRoleBindingKind,
 				Name:      "",
 				Namespace: "test-ns",
 			},
 			wantRef: kudov1alpha1.EscalationGrantRef{
-				Kind:      granter.K8sRoleBindingGranterKind,
+				Kind:      grant.K8sRoleBindingKind,
 				Name:      "", // testclient does not handle generate name.
 				Namespace: "test-ns",
 				Status:    kudov1alpha1.GrantStatusReclaimed,
@@ -298,12 +298,12 @@ func TestK8sRoleBindingGranter_Reclaim(t *testing.T) {
 			desc: "does not delete the role binding if it does not exists",
 			seed: []runtime.Object{&otherBinding},
 			grantRef: kudov1alpha1.EscalationGrantRef{
-				Kind:      granter.K8sRoleBindingGranterKind,
+				Kind:      grant.K8sRoleBindingKind,
 				Name:      "",
 				Namespace: "test-ns",
 			},
 			wantRef: kudov1alpha1.EscalationGrantRef{
-				Kind:      granter.K8sRoleBindingGranterKind,
+				Kind:      grant.K8sRoleBindingKind,
 				Name:      "", // testclient does not handle generate name.
 				Namespace: "test-ns",
 				Status:    kudov1alpha1.GrantStatusReclaimed,
@@ -323,7 +323,7 @@ func TestK8sRoleBindingGranter_Reclaim(t *testing.T) {
 
 			defer cancel()
 
-			granter, err := factory.Get(granter.K8sRoleBindingGranterKind)
+			granter, err := factory.Get(grant.K8sRoleBindingKind)
 			require.NoError(t, err)
 
 			gotRef, err := granter.Reclaim(ctx, testCase.grantRef)
@@ -348,7 +348,7 @@ type fakeK8s struct {
 	kubeInformersFactory kubeinformers.SharedInformerFactory
 }
 
-func buildTestFactory(t *testing.T, kubeSeed []runtime.Object) (granter.Factory, fakeK8s, func()) {
+func buildTestFactory(t *testing.T, kubeSeed []runtime.Object) (grant.Factory, fakeK8s, func()) {
 	t.Helper()
 
 	var (
@@ -360,7 +360,7 @@ func buildTestFactory(t *testing.T, kubeSeed []runtime.Object) (granter.Factory,
 				60*time.Second,
 			),
 		}
-		granterFactory = granter.DefaultGranterFactory(
+		grantFactory = grant.DefaultGranterFactory(
 			k8s.kubeInformersFactory,
 			k8s.kubeClientSet,
 		)
@@ -374,5 +374,5 @@ func buildTestFactory(t *testing.T, kubeSeed []runtime.Object) (granter.Factory,
 	)
 	require.NoError(t, err)
 
-	return granterFactory, k8s, func() { close(done) }
+	return grantFactory, k8s, func() { close(done) }
 }
