@@ -32,7 +32,7 @@ var (
 	webhookConfig webhooksupport.ServerConfig
 )
 
-const defaultInformerResyncInterval = 30 * time.Second
+const defaultInformerResyncInterval = time.Hour
 
 func main() {
 	flag.StringVar(&kubeconfig, "kubeconfig", "", "Path to a kubeconfig. Only required if out-of-cluster.")
