@@ -1,6 +1,7 @@
 package v1alpha1
 
 import (
+	"strings"
 	"time"
 
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -89,6 +90,14 @@ type EscalationSpec struct {
 	Reason     string `json:"reason"`
 	Namespace  string `json:"namespace"`
 }
+
+func (e *EscalationSpec) IsValid() bool {
+	return notBlank(e.PolicyName) &&
+		notBlank(e.Requestor) &&
+		notBlank(e.Reason)
+}
+
+func notBlank(v string) bool { return strings.TrimSpace(v) != "" }
 
 type EscalationState string
 

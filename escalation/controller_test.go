@@ -90,10 +90,32 @@ func TestEscalationController_OnCreate(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-escalation",
 				},
+				Spec: kudov1alpha1.EscalationSpec{
+					PolicyName: testPolicy.Name,
+					Requestor:  "john-claude",
+					Reason:     "blah blah",
+				},
 			},
 			wantEscalationStatus: kudov1alpha1.EscalationStatus{
 				State:        kudov1alpha1.StateDenied,
 				StateDetails: escalation.DeniedPolicyNotFoundStateDetails,
+			},
+		},
+		{
+			desc: "denies escalation if escalation spec isn't complete",
+			createdEscalation: kudov1alpha1.Escalation{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-escalation",
+				},
+				Spec: kudov1alpha1.EscalationSpec{
+					PolicyName: testPolicy.Name,
+					Requestor:  "john-claude",
+					Reason:     "         ",
+				},
+			},
+			wantEscalationStatus: kudov1alpha1.EscalationStatus{
+				State:        kudov1alpha1.StateDenied,
+				StateDetails: escalation.DeniedBadEscalationSpec,
 			},
 		},
 		{
@@ -108,6 +130,8 @@ func TestEscalationController_OnCreate(t *testing.T) {
 				},
 				Spec: kudov1alpha1.EscalationSpec{
 					PolicyName: testPolicy.Name,
+					Requestor:  "john-claude",
+					Reason:     "blah blah",
 				},
 			},
 			wantEscalationStatus: kudov1alpha1.EscalationStatus{

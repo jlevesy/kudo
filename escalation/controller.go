@@ -21,6 +21,7 @@ const (
 	AcceptedInProgressStateDetails   = "This escalation has been accepted, permissions are going to be granted in a few moments"
 	AcceptedAppliedStateDetails      = "This escalation has been accepted, permissions are granted"
 	ExpiredStateDetails              = "This escalation has expired, all granted permissions are reclaimed"
+	DeniedBadEscalationSpec          = "This escalation does not have necessary information, it is denied"
 	DeniedPolicyNotFoundStateDetails = "This escalation references a policy that do not exist anymore, all granted permissions are reclaimed"
 	DeniedPolicyChangedStateDetails  = "This escalation references a policy that has changed, all granted permissions are reclaimed"
 )
@@ -85,6 +86,19 @@ func NewController(
 }
 
 func (h *Controller) OnAdd(ctx context.Context, escalation *kudov1alpha1.Escalation) (EventInsight, error) {
+	if !escalation.Spec.IsValid() {
+		_, err := h.updateStatus(
+			ctx,
+			escalation,
+			escalation.Status.TransitionTo(
+				kudov1alpha1.StateDenied,
+				kudov1alpha1.WithDetails(DeniedBadEscalationSpec),
+			),
+		)
+
+		return EventInsight{}, err
+	}
+
 	policy, newStatus, updated, err := h.readPolicyAndCheckExpiration(ctx, escalation)
 	if err != nil {
 		return EventInsight{}, err
