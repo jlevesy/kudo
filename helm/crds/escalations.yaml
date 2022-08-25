@@ -47,6 +47,8 @@ spec:
                   type: string
                 policyVersion:
                   type: string
+                expiresAt:
+                  type: string
                 grantRefs:
                   type: array
                   items:

@@ -243,6 +243,7 @@ func (in *EscalationStatus) DeepCopyInto(out *EscalationStatus) {
 		*out = make([]EscalationGrantRef, len(*in))
 		copy(*out, *in)
 	}
+	in.ExpiresAt.DeepCopyInto(&out.ExpiresAt)
 	return
 }
 
