@@ -25,9 +25,11 @@ import (
 )
 
 var (
-	masterURL   string
-	kubeconfig  string
-	threadiness int
+	masterURL      string
+	kubeconfig     string
+	threadiness    int
+	resyncInterval time.Duration
+	retryInterval  time.Duration
 
 	webhookConfig webhooksupport.ServerConfig
 )
@@ -41,6 +43,8 @@ func main() {
 	flag.StringVar(&webhookConfig.KeyPath, "webhook_key", "", "Path to webhook TLS key")
 	flag.StringVar(&webhookConfig.Addr, "webhook_addr", ":8080", "Webhook listening address")
 	flag.IntVar(&threadiness, "threadiness", 10, "Amount of events processed in paralled")
+	flag.DurationVar(&resyncInterval, "resync_interval", 30*time.Second, "Maximum period to resync an active escalation")
+	flag.DurationVar(&retryInterval, "retry_interval", 10*time.Second, "Maximum period retry an escalation not fully granted/reclaimed")
 	klog.InitFlags(nil)
 
 	flag.Parse()
@@ -81,6 +85,8 @@ func main() {
 				policiesLister,
 				escalationsClient,
 				granterFactory,
+				escalation.WithResyncInterval(resyncInterval),
+				escalation.WithRetryInterval(retryInterval),
 			),
 			kudov1alpha1.KindEscalation,
 			threadiness,

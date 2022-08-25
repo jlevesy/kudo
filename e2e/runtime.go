@@ -242,6 +242,8 @@ func installKudo(ctx context.Context, kubeConfigPath string) error {
 				"--create-namespace",
 				"--namespace=" + kudoInstallNamespace,
 				"--set=image.devRef=" + imageRef,
+				"--set=controller.resyncInterval=5s",
+				"--set=controller.retryInterval=1s",
 				"--wait",
 				"--timeout=1m",
 				"kudo-e2e",
