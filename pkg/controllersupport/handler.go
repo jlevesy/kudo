@@ -14,12 +14,19 @@ import (
 // ErrTransientError can be returned by an EventHandler to trigger a retry.
 var ErrTransientError = errors.New("transient error")
 
+type EventInsight[T any] struct {
+	ResyncAfter time.Duration
+
+	Object *T
+}
+
 // EventHandler represents a object that handles mutation event  a k8s object.
-// It is based on k8s-clen cache.EventHandler.
+// It is based on k8s-client cache.EventHandler.
+// Each method returns an insght that tells how the worker should behave regarding that event.
 type EventHandler[T any] interface {
-	OnAdd(ctx context.Context, obj *T) error
-	OnUpdate(ctx context.Context, oldObj, newObj *T) error
-	OnDelete(ctx context.Context, obj *T) error
+	OnAdd(ctx context.Context, obj *T) (EventInsight[T], error)
+	OnUpdate(ctx context.Context, oldObj, newObj *T) (EventInsight[T], error)
+	OnDelete(ctx context.Context, obj *T) (EventInsight[T], error)
 }
 
 // QueuedEventHandler implements cache.EventHandler over a workqueue.
@@ -100,7 +107,10 @@ func (h *QueuedEventHandler[T]) processItem(ctx context.Context) bool {
 		return true
 	}
 
-	var err error
+	var (
+		err     error
+		insight EventInsight[T]
+	)
 
 	switch event.kind {
 	case kindAdd:
@@ -110,7 +120,8 @@ func (h *QueuedEventHandler[T]) processItem(ctx context.Context) bool {
 			return true
 		}
 
-		err = h.handler.OnAdd(ctx, typedObject)
+		insight, err = h.handler.OnAdd(ctx, typedObject)
+
 	case kindUpdate:
 		typedOldObject, okOld := event.oldObj.(*T)
 		typedNewObject, okNew := event.newObj.(*T)
@@ -120,7 +131,7 @@ func (h *QueuedEventHandler[T]) processItem(ctx context.Context) bool {
 			return true
 		}
 
-		err = h.handler.OnUpdate(ctx, typedOldObject, typedNewObject)
+		insight, err = h.handler.OnUpdate(ctx, typedOldObject, typedNewObject)
 
 	case kindDelete:
 		typedObject, ok := event.object.(*T)
@@ -129,7 +140,7 @@ func (h *QueuedEventHandler[T]) processItem(ctx context.Context) bool {
 			return true
 		}
 
-		err = h.handler.OnDelete(ctx, typedObject)
+		insight, err = h.handler.OnDelete(ctx, typedObject)
 
 	default:
 		h.workqueue.Forget(obj)
@@ -147,6 +158,18 @@ func (h *QueuedEventHandler[T]) processItem(ctx context.Context) bool {
 	}
 
 	h.workqueue.Forget(obj)
+
+	if insight.ResyncAfter > 0 {
+		h.workqueue.AddAfter(
+			queueEvent{
+				kind:   event.kind,
+				object: insight.Object,
+				oldObj: event.newObj,
+				newObj: insight.Object,
+			},
+			insight.ResyncAfter,
+		)
+	}
 
 	return true
 }

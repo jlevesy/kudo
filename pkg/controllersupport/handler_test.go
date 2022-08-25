@@ -13,7 +13,7 @@ import (
 func TestQueuedEventHandler_HandlesEvent(t *testing.T) {
 	var (
 		ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
-		handler     = testHandler{
+		handler     = testHandler[int]{
 			wantCalls: 4,
 			done:      cancel,
 		}
@@ -41,44 +41,75 @@ func TestQueuedEventHandler_HandlesEvent(t *testing.T) {
 	assert.True(t, handler.isComplete())
 }
 
-type testHandler struct {
+func TestQueuedEventHandler_RequeuesAfter(t *testing.T) {
+	var (
+		ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+		v           = generics.Ptr(4)
+		handler     = testHandler[int]{
+			wantCalls: 2,
+			insight: controllersupport.EventInsight[int]{
+				ResyncAfter: time.Millisecond,
+				Object:      v,
+			},
+			done: cancel,
+		}
+		eventHandler = controllersupport.NewQueuedEventHandler[int](
+			&handler,
+			"test",
+			1,
+		)
+	)
+
+	defer cancel()
+
+	// Enqueue some callvs.
+	eventHandler.OnUpdate(v, v)
+
+	// Run the queue until completion.
+	eventHandler.Run(ctx)
+
+	assert.True(t, handler.isComplete())
+}
+
+type testHandler[T any] struct {
 	addReceived    int
 	updateReceived int
 	deleteReceived int
+	insight        controllersupport.EventInsight[T]
 
 	wantCalls int
 	done      func()
 }
 
-func (h *testHandler) OnAdd(context.Context, *int) error {
+func (h *testHandler[T]) OnAdd(context.Context, *int) (controllersupport.EventInsight[T], error) {
 	v := h.addReceived
 	h.addReceived++
 	// On first call, return transient error to test the retry behavior.
 	if v == 0 {
-		return controllersupport.ErrTransientError
+		return controllersupport.EventInsight[T]{}, controllersupport.ErrTransientError
 	}
 	h.call()
-	return nil
+	return h.insight, nil
 }
 
-func (h *testHandler) OnUpdate(_ context.Context, _, _ *int) error {
+func (h *testHandler[T]) OnUpdate(_ context.Context, _, _ *int) (controllersupport.EventInsight[T], error) {
 	h.updateReceived++
 	h.call()
-	return nil
+	return h.insight, nil
 }
 
-func (h *testHandler) OnDelete(context.Context, *int) error {
+func (h *testHandler[T]) OnDelete(context.Context, *int) (controllersupport.EventInsight[T], error) {
 	h.deleteReceived++
 	h.call()
-	return nil
+	return h.insight, nil
 }
 
-func (h *testHandler) call() {
+func (h *testHandler[T]) call() {
 	if h.isComplete() {
 		h.done()
 	}
 }
 
-func (h *testHandler) isComplete() bool {
+func (h *testHandler[T]) isComplete() bool {
 	return h.wantCalls == (h.addReceived + h.updateReceived + h.deleteReceived)
 }
