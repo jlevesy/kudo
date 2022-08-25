@@ -13,7 +13,7 @@ spec:
         - kind: Group
           name: squad-b@voiapp.io
   target: # (required) what the escalation grants
-    duration: 30s
+    duration: 10s
     grants:
     - kind: KubernetesRoleBinding
       defaultNamespace: some-app
