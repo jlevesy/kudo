@@ -13,6 +13,7 @@ import (
 
 	"github.com/jlevesy/kudo/grant"
 	kudov1alpha1 "github.com/jlevesy/kudo/pkg/apis/k8s.kudo.dev/v1alpha1"
+	"github.com/jlevesy/kudo/pkg/controllersupport"
 )
 
 const (
@@ -20,6 +21,7 @@ const (
 	AcceptedInProgressStateDetails   = "This escalation has been accepted, permissions are going to be granted in a few moments"
 	AcceptedAppliedStateDetails      = "This escalation has been accepted, permissions are granted"
 	ExpiredStateDetails              = "This escalation has expired, all granted permissions are reclaimed"
+	DeniedBadEscalationSpec          = "This escalation does not have necessary information, it is denied"
 	DeniedPolicyNotFoundStateDetails = "This escalation references a policy that do not exist anymore, all granted permissions are reclaimed"
 	DeniedPolicyChangedStateDetails  = "This escalation references a policy that has changed, all granted permissions are reclaimed"
 )
@@ -30,34 +32,83 @@ type EscalationStatusUpdater interface {
 	UpdateStatus(ctx context.Context, escalation *kudov1alpha1.Escalation, opts metav1.UpdateOptions) (*kudov1alpha1.Escalation, error)
 }
 
+type EventInsight = controllersupport.EventInsight[kudov1alpha1.Escalation]
+
 type Controller struct {
 	policiesGetter          EscalationPoliciesGetter
 	escalationStatusUpdater EscalationStatusUpdater
 	granterFactory          grant.Factory
+	nowFunc                 func() time.Time
+	resyncInterval          time.Duration
+	retryInterval           time.Duration
+}
+
+type ControllerOpt func(c *Controller)
+
+func WithNowFunc(now func() time.Time) ControllerOpt {
+	return func(c *Controller) {
+		c.nowFunc = now
+	}
+}
+
+func WithResyncInterval(d time.Duration) ControllerOpt {
+	return func(c *Controller) {
+		c.resyncInterval = d
+	}
+}
+
+func WithRetryInterval(d time.Duration) ControllerOpt {
+	return func(c *Controller) {
+		c.retryInterval = d
+	}
 }
 
 func NewController(
 	policiesGetter EscalationPoliciesGetter,
 	escalationStatusUpdater EscalationStatusUpdater,
 	granterFactory grant.Factory,
+	opts ...ControllerOpt,
 ) *Controller {
-	return &Controller{
+	c := Controller{
 		policiesGetter:          policiesGetter,
 		escalationStatusUpdater: escalationStatusUpdater,
 		granterFactory:          granterFactory,
+		nowFunc:                 time.Now,
+		resyncInterval:          30 * time.Second,
+		retryInterval:           5 * time.Second,
 	}
+
+	for _, opt := range opts {
+		opt(&c)
+	}
+
+	return &c
 }
 
-func (h *Controller) OnAdd(ctx context.Context, escalation *kudov1alpha1.Escalation) error {
-	policy, newStatus, updated, err := h.readPolicyAndCheckExpiration(ctx, escalation)
-	if err != nil {
-		return err
-	}
-	if updated {
-		return h.updateStatus(ctx, escalation, newStatus)
+func (h *Controller) OnAdd(ctx context.Context, escalation *kudov1alpha1.Escalation) (EventInsight, error) {
+	if !escalation.Spec.IsValid() {
+		_, err := h.updateStatus(
+			ctx,
+			escalation,
+			escalation.Status.TransitionTo(
+				kudov1alpha1.StateDenied,
+				kudov1alpha1.WithDetails(DeniedBadEscalationSpec),
+			),
+		)
+
+		return EventInsight{}, err
 	}
 
-	return h.updateStatus(
+	policy, newStatus, updated, err := h.readPolicyAndCheckExpiration(ctx, escalation)
+	if err != nil {
+		return EventInsight{}, err
+	}
+	if updated {
+		_, err = h.updateStatus(ctx, escalation, newStatus)
+		return EventInsight{}, err
+	}
+
+	_, err = h.updateStatus(
 		ctx,
 		escalation,
 		escalation.Status.TransitionTo(
@@ -66,32 +117,45 @@ func (h *Controller) OnAdd(ctx context.Context, escalation *kudov1alpha1.Escalat
 			kudov1alpha1.WithPolicyInfo(policy.UID, policy.ResourceVersion),
 		),
 	)
+
+	return EventInsight{}, err
 }
 
-func (h *Controller) OnUpdate(ctx context.Context, oldEsc, newEsc *kudov1alpha1.Escalation) error {
-	status, err := h.reconcileState(ctx, oldEsc, newEsc)
-
+func (c *Controller) OnUpdate(ctx context.Context, _, esc *kudov1alpha1.Escalation) (EventInsight, error) {
+	status, err := c.reconcileState(ctx, esc)
 	if err != nil {
-		return err
+		return EventInsight{}, err
 	}
 
-	return h.updateStatus(ctx, newEsc, status)
+	updatedEsc, err := c.updateStatus(ctx, esc, status)
+	if err != nil {
+		return EventInsight{}, err
+	}
+
+	// If the resource has been updated, we'll get an update event, no need to reschedule anything.
+	if esc.ResourceVersion != updatedEsc.ResourceVersion {
+		return EventInsight{}, nil
+	}
+
+	// If no update, then let's pick an appropriate next schedule time.
+	nextInsight := c.nextEventInsight(updatedEsc)
+
+	if nextInsight.ResyncAfter > 0 {
+		klog.InfoS("Next processing scheduled", "escalation", updatedEsc.Name, "in", nextInsight.ResyncAfter)
+	}
+
+	return nextInsight, nil
 }
 
-func (h *Controller) OnDelete(ctx context.Context, esc *kudov1alpha1.Escalation) error {
+func (h *Controller) OnDelete(ctx context.Context, esc *kudov1alpha1.Escalation) (EventInsight, error) {
 	// TODO(jly) try to reclaim.
-	return nil
+	return EventInsight{}, nil
 }
 
-func hasPolicyChanged(esc *kudov1alpha1.Escalation, policy *kudov1alpha1.EscalationPolicy) bool {
-	return policy.UID != esc.Status.PolicyUID ||
-		policy.ResourceVersion != esc.Status.PolicyVersion
-}
-
-func (h *Controller) reconcileState(ctx context.Context, _, newEsc *kudov1alpha1.Escalation) (kudov1alpha1.EscalationStatus, error) {
+func (c *Controller) reconcileState(ctx context.Context, newEsc *kudov1alpha1.Escalation) (kudov1alpha1.EscalationStatus, error) {
 	switch newEsc.Status.State {
 	case kudov1alpha1.StatePending:
-		policy, newStatus, updated, err := h.readPolicyAndCheckExpiration(ctx, newEsc)
+		policy, newStatus, updated, err := c.readPolicyAndCheckExpiration(ctx, newEsc)
 		if err != nil {
 			return statusZero, err
 		}
@@ -112,11 +176,12 @@ func (h *Controller) reconcileState(ctx context.Context, _, newEsc *kudov1alpha1
 		// if ok, transition to accepted.
 		return newEsc.Status.TransitionTo(
 			kudov1alpha1.StateAccepted,
+			kudov1alpha1.WithExpiresAt(c.nowFunc().Add(policy.Spec.Target.Duration.Duration)),
 			kudov1alpha1.WithDetails(AcceptedInProgressStateDetails),
 		), nil
 
 	case kudov1alpha1.StateAccepted:
-		policy, newStatus, updated, err := h.readPolicyAndCheckExpiration(ctx, newEsc)
+		policy, newStatus, updated, err := c.readPolicyAndCheckExpiration(ctx, newEsc)
 		if err != nil {
 			return statusZero, err
 		}
@@ -131,10 +196,10 @@ func (h *Controller) reconcileState(ctx context.Context, _, newEsc *kudov1alpha1
 			), nil
 		}
 
-		return h.createGrants(ctx, newEsc, policy)
+		return c.createGrants(ctx, newEsc, policy)
 
 	case kudov1alpha1.StateExpired:
-		grantRefs, err := h.reclaimGrants(ctx, newEsc)
+		grantRefs, err := c.reclaimGrants(ctx, newEsc)
 		if err != nil {
 			return newEsc.Status.TransitionTo(
 				kudov1alpha1.StateExpired,
@@ -154,7 +219,7 @@ func (h *Controller) reconcileState(ctx context.Context, _, newEsc *kudov1alpha1
 		), nil
 
 	case kudov1alpha1.StateDenied:
-		grantRefs, err := h.reclaimGrants(ctx, newEsc)
+		grantRefs, err := c.reclaimGrants(ctx, newEsc)
 		if err != nil {
 			return newEsc.Status.TransitionTo(
 				kudov1alpha1.StateDenied,
@@ -269,11 +334,9 @@ func (h *Controller) reclaimGrants(ctx context.Context, esc *kudov1alpha1.Escala
 	return grantRefs, nil
 }
 
-func (h *Controller) readPolicyAndCheckExpiration(ctx context.Context, esc *kudov1alpha1.Escalation) (*kudov1alpha1.EscalationPolicy, kudov1alpha1.EscalationStatus, bool, error) {
-	now := time.Now()
-
+func (c *Controller) readPolicyAndCheckExpiration(ctx context.Context, esc *kudov1alpha1.Escalation) (*kudov1alpha1.EscalationPolicy, kudov1alpha1.EscalationStatus, bool, error) {
 	// Does the referenced policy exists?
-	policy, err := h.policiesGetter.Get(esc.Spec.PolicyName)
+	policy, err := c.policiesGetter.Get(esc.Spec.PolicyName)
 	switch {
 	case errors.IsNotFound(err):
 		return nil,
@@ -289,7 +352,7 @@ func (h *Controller) readPolicyAndCheckExpiration(ctx context.Context, esc *kudo
 	}
 
 	// Is the escalation already expired? If so, transition its state and abort.
-	if now.After(esc.CreationTimestamp.Add(policy.Spec.Target.Duration.Duration)) {
+	if c.nowFunc().After(esc.CreationTimestamp.Add(policy.Spec.Target.Duration.Duration)) {
 		return nil,
 			esc.Status.TransitionTo(
 				kudov1alpha1.StateExpired,
@@ -302,7 +365,7 @@ func (h *Controller) readPolicyAndCheckExpiration(ctx context.Context, esc *kudo
 	return policy, statusZero, false, nil
 }
 
-func (h *Controller) updateStatus(ctx context.Context, escalation *kudov1alpha1.Escalation, status kudov1alpha1.EscalationStatus) error {
+func (h *Controller) updateStatus(ctx context.Context, escalation *kudov1alpha1.Escalation, status kudov1alpha1.EscalationStatus) (*kudov1alpha1.Escalation, error) {
 	clonedEscalation := escalation.DeepCopy()
 	clonedEscalation.Status = status
 
@@ -318,7 +381,49 @@ func (h *Controller) updateStatus(ctx context.Context, escalation *kudov1alpha1.
 		)
 	}
 
-	_, err := h.escalationStatusUpdater.UpdateStatus(ctx, clonedEscalation, metav1.UpdateOptions{})
+	return h.escalationStatusUpdater.UpdateStatus(ctx, clonedEscalation, metav1.UpdateOptions{})
+}
 
-	return err
+func (c *Controller) nextEventInsight(esc *kudov1alpha1.Escalation) EventInsight {
+	switch esc.Status.State {
+	case kudov1alpha1.StateAccepted:
+		if !esc.Status.AllGrantsInStatus(kudov1alpha1.GrantStatusCreated) {
+			return EventInsight{
+				ResyncAfter: c.retryInterval,
+				Object:      esc,
+			}
+		}
+
+		var (
+			resyncDelay       = c.resyncInterval
+			delayToExpiration = esc.Status.ExpiresAt.Sub(c.nowFunc())
+		)
+
+		if delayToExpiration < resyncDelay {
+			resyncDelay = delayToExpiration
+		}
+
+		return EventInsight{
+			ResyncAfter: resyncDelay,
+			Object:      esc,
+		}
+	case kudov1alpha1.StateDenied, kudov1alpha1.StateExpired:
+		if !esc.Status.AllGrantsInStatus(kudov1alpha1.GrantStatusReclaimed) {
+			return EventInsight{
+				ResyncAfter: c.retryInterval,
+				Object:      esc,
+			}
+		}
+
+		klog.InfoS("Not resyncing because denied / expired and all reclaimed", "escalation", esc.Name)
+		return EventInsight{}
+	default:
+		klog.InfoS("Not resyncing because in unreschedulable state", "escalation", esc.Name, "state", esc.Status.State)
+		return EventInsight{}
+	}
+}
+
+func hasPolicyChanged(esc *kudov1alpha1.Escalation, policy *kudov1alpha1.EscalationPolicy) bool {
+	return policy.UID != esc.Status.PolicyUID ||
+		policy.ResourceVersion != esc.Status.PolicyVersion
 }

@@ -1,5 +1,9 @@
 replicaCount: 1
 
+controller:
+  resyncInterval: 30s
+  retryInterval: 10s
+
 image:
   repository: ghcr.io/jlevesy/kudo/controller
   pullPolicy: Always

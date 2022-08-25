@@ -9,7 +9,7 @@ install_dependencies:
 
 .PHONY: unit_tests
 unit_tests:
-	go test -failfast -cover $(shell go list ./... | grep -v e2e)
+	go test -failfast -count=$(COUNT) -cover $(shell go list ./... | grep -v e2e)
 
 .PHONY: e2e_tests
 e2e_tests:

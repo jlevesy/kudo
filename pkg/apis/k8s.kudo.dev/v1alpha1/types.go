@@ -1,6 +1,9 @@
 package v1alpha1
 
 import (
+	"strings"
+	"time"
+
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -88,6 +91,14 @@ type EscalationSpec struct {
 	Namespace  string `json:"namespace"`
 }
 
+func (e *EscalationSpec) IsValid() bool {
+	return notBlank(e.PolicyName) &&
+		notBlank(e.Requestor) &&
+		notBlank(e.Reason)
+}
+
+func notBlank(v string) bool { return strings.TrimSpace(v) != "" }
+
 type EscalationState string
 
 const (
@@ -101,9 +112,24 @@ const (
 type EscalationStatus struct {
 	State         EscalationState      `json:"state"`
 	StateDetails  string               `json:"stateDetails"`
-	GrantRefs     []EscalationGrantRef `json:"grantRefs"`
 	PolicyUID     types.UID            `json:"policyUid"`
 	PolicyVersion string               `json:"policyVersion"`
+	ExpiresAt     metav1.Time          `json:"expiresAt"`
+	GrantRefs     []EscalationGrantRef `json:"grantRefs"`
+}
+
+func (e *EscalationStatus) AllGrantsInStatus(wantStatus GrantStatus) bool {
+	if len(e.GrantRefs) == 0 {
+		return false
+	}
+
+	for _, ref := range e.GrantRefs {
+		if ref.Status != wantStatus {
+			return false
+		}
+	}
+
+	return true
 }
 
 type TransitionMutation func(st *EscalationStatus)
@@ -127,6 +153,12 @@ func WithPolicyInfo(uid types.UID, version string) TransitionMutation {
 	}
 }
 
+func WithExpiresAt(t time.Time) TransitionMutation {
+	return func(st *EscalationStatus) {
+		st.ExpiresAt = metav1.Time{Time: t}
+	}
+}
+
 func (e *EscalationStatus) TransitionTo(state EscalationState, mutations ...TransitionMutation) EscalationStatus {
 	newStatus := EscalationStatus{
 		State:         state,
@@ -134,6 +166,7 @@ func (e *EscalationStatus) TransitionTo(state EscalationState, mutations ...Tran
 		GrantRefs:     e.GrantRefs,
 		PolicyUID:     e.PolicyUID,
 		PolicyVersion: e.PolicyVersion,
+		ExpiresAt:     e.ExpiresAt,
 	}
 
 	for _, mut := range mutations {
