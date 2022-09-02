@@ -10,16 +10,21 @@ import (
 	"time"
 
 	"golang.org/x/sync/errgroup"
+	corev1 "k8s.io/api/core/v1"
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
+	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 
+	"github.com/jlevesy/kudo/audit"
 	"github.com/jlevesy/kudo/escalation"
 	"github.com/jlevesy/kudo/grant"
 	kudov1alpha1 "github.com/jlevesy/kudo/pkg/apis/k8s.kudo.dev/v1alpha1"
 	"github.com/jlevesy/kudo/pkg/controllersupport"
 	clientset "github.com/jlevesy/kudo/pkg/generated/clientset/versioned"
+	"github.com/jlevesy/kudo/pkg/generated/clientset/versioned/scheme"
 	kudoinformers "github.com/jlevesy/kudo/pkg/generated/informers/externalversions"
 	"github.com/jlevesy/kudo/pkg/webhooksupport"
 )
@@ -69,6 +74,10 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
+	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster.StartStructuredLogging(0)
+	eventBroadcaster.StartRecordingToSink(&typedcorev1.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
+
 	var (
 		serveMux = http.NewServeMux()
 
@@ -85,6 +94,14 @@ func main() {
 				policiesLister,
 				escalationsClient,
 				granterFactory,
+				audit.MutliAsyncSink(
+					audit.NewK8sEventSink(
+						eventBroadcaster.NewRecorder(
+							scheme.Scheme,
+							corev1.EventSource{Component: "kudo-controller"},
+						),
+					),
+				),
 				escalation.WithResyncInterval(resyncInterval),
 				escalation.WithRetryInterval(retryInterval),
 			),
