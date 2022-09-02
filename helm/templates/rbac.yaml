@@ -5,6 +5,13 @@ metadata:
   name: {{ include "helm.fullname" . }}-controller
 rules:
 - apiGroups:
+    - ""
+  resources:
+    - "events"
+  verbs:
+    - "create"
+    - "patch"
+- apiGroups:
     - "rbac.authorization.k8s.io"
   resources:
     - "roles"
