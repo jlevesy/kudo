@@ -12,7 +12,9 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 
+	"github.com/jlevesy/kudo/audit"
 	"github.com/jlevesy/kudo/escalation"
 	"github.com/jlevesy/kudo/grant"
 	kudov1alpha1 "github.com/jlevesy/kudo/pkg/apis/k8s.kudo.dev/v1alpha1"
@@ -115,7 +117,7 @@ func TestEscalationController_OnCreate(t *testing.T) {
 			},
 			wantEscalationStatus: kudov1alpha1.EscalationStatus{
 				State:        kudov1alpha1.StateDenied,
-				StateDetails: escalation.DeniedBadEscalationSpec,
+				StateDetails: escalation.DeniedBadEscalationSpecDetails,
 			},
 		},
 		{
@@ -915,6 +917,7 @@ func buildController(t *testing.T, granterFactory grant.Factory, kudoSeed []runt
 			k8s.kudoInformersFactory.K8s().V1alpha1().EscalationPolicies().Lister(),
 			k8s.kudoClientSet.K8sV1alpha1().Escalations(),
 			granterFactory,
+			audit.NewK8sEventSink(&record.FakeRecorder{}),
 			escalation.WithNowFunc(nowFunc),
 			escalation.WithResyncInterval(resyncDelay),
 			escalation.WithRetryInterval(retryDelay),
