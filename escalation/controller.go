@@ -11,6 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 
+	"github.com/jlevesy/kudo/audit"
 	"github.com/jlevesy/kudo/grant"
 	kudov1alpha1 "github.com/jlevesy/kudo/pkg/apis/k8s.kudo.dev/v1alpha1"
 	"github.com/jlevesy/kudo/pkg/controllersupport"
@@ -21,7 +22,8 @@ const (
 	AcceptedInProgressStateDetails   = "This escalation has been accepted, permissions are going to be granted in a few moments"
 	AcceptedAppliedStateDetails      = "This escalation has been accepted, permissions are granted"
 	ExpiredStateDetails              = "This escalation has expired, all granted permissions are reclaimed"
-	DeniedBadEscalationSpec          = "This escalation does not have necessary information, it is denied"
+	ExpiredStateWillReclaimDetails   = "This escalation has expired, all granted permissions are going to be reclaimed"
+	DeniedBadEscalationSpecDetails   = "This escalation does not have necessary information, it is denied"
 	DeniedPolicyNotFoundStateDetails = "This escalation references a policy that do not exist anymore, all granted permissions are reclaimed"
 	DeniedPolicyChangedStateDetails  = "This escalation references a policy that has changed, all granted permissions are reclaimed"
 )
@@ -38,9 +40,11 @@ type Controller struct {
 	policiesGetter          EscalationPoliciesGetter
 	escalationStatusUpdater EscalationStatusUpdater
 	granterFactory          grant.Factory
-	nowFunc                 func() time.Time
-	resyncInterval          time.Duration
-	retryInterval           time.Duration
+	auditSink               audit.Sink
+
+	nowFunc        func() time.Time
+	resyncInterval time.Duration
+	retryInterval  time.Duration
 }
 
 type ControllerOpt func(c *Controller)
@@ -67,12 +71,14 @@ func NewController(
 	policiesGetter EscalationPoliciesGetter,
 	escalationStatusUpdater EscalationStatusUpdater,
 	granterFactory grant.Factory,
+	auditSink audit.Sink,
 	opts ...ControllerOpt,
 ) *Controller {
 	c := Controller{
 		policiesGetter:          policiesGetter,
 		escalationStatusUpdater: escalationStatusUpdater,
 		granterFactory:          granterFactory,
+		auditSink:               auditSink,
 		nowFunc:                 time.Now,
 		resyncInterval:          30 * time.Second,
 		retryInterval:           5 * time.Second,
@@ -86,13 +92,15 @@ func NewController(
 }
 
 func (c *Controller) OnAdd(ctx context.Context, escalation *kudov1alpha1.Escalation) (EventInsight, error) {
+	c.auditSink.RecordCreate(ctx, escalation)
+
 	if !escalation.Spec.IsValid() {
 		_, err := c.updateStatus(
 			ctx,
 			escalation,
 			escalation.Status.TransitionTo(
 				kudov1alpha1.StateDenied,
-				kudov1alpha1.WithDetails(DeniedBadEscalationSpec),
+				kudov1alpha1.WithDetails(DeniedBadEscalationSpecDetails),
 			),
 		)
 
@@ -148,8 +156,12 @@ func (c *Controller) OnUpdate(ctx context.Context, _, esc *kudov1alpha1.Escalati
 }
 
 func (c *Controller) OnDelete(ctx context.Context, esc *kudov1alpha1.Escalation) (EventInsight, error) {
-	// TODO(jly) try to reclaim.
-	return EventInsight{}, nil
+	klog.InfoS("Escalation deleted, reclaiming permissions", "escalation", esc.Name)
+
+	c.auditSink.RecordDelete(ctx, esc)
+
+	_, err := c.reclaimGrants(ctx, esc)
+	return EventInsight{}, err
 }
 
 func (c *Controller) reconcileState(ctx context.Context, newEsc *kudov1alpha1.Escalation) (kudov1alpha1.EscalationStatus, error) {
@@ -369,19 +381,17 @@ func (c *Controller) updateStatus(ctx context.Context, escalation *kudov1alpha1.
 	clonedEscalation := escalation.DeepCopy()
 	clonedEscalation.Status = status
 
-	if escalation.Status.State != status.State {
-		klog.InfoS(
-			"Transitioning escalation",
-			"escalation",
-			clonedEscalation.Name,
-			"oldState",
-			escalation.Status.State,
-			"newState",
-			clonedEscalation.Status.State,
-		)
+	newEsc, err := c.escalationStatusUpdater.UpdateStatus(ctx, clonedEscalation, metav1.UpdateOptions{})
+	if err != nil {
+		return nil, err
 	}
 
-	return c.escalationStatusUpdater.UpdateStatus(ctx, clonedEscalation, metav1.UpdateOptions{})
+	// When there's a state update, record it.
+	if newEsc.ResourceVersion != escalation.ResourceVersion {
+		c.auditSink.RecordUpdate(ctx, escalation, newEsc)
+	}
+
+	return newEsc, nil
 }
 
 func (c *Controller) nextEventInsight(esc *kudov1alpha1.Escalation) EventInsight {
