@@ -1,0 +1,82 @@
++++
+title = "Kudo"
+linkTitle = "Kudo"
+
++++
+
+{{< blocks/cover title="Kudo: sudo for Kubernetes" image_anchor="top" height="full" color="orange" >}}
+<div class="mx-auto">
+	<a class="btn btn-lg btn-primary mr-3 mb-4" href="{{< relref "/docs" >}}">
+		Documentation <i class="fas fa-arrow-alt-circle-right ml-2"></i>
+	</a>
+	<a class="btn btn-lg btn-secondary mr-3 mb-4" href="https://github.com/jlevesy/kudo">
+		Repository <i class="fab fa-github ml-2 "></i>
+	</a>
+</div>
+{{< /blocks/cover >}}
+
+{{% blocks/lead %}}
+
+Kudo is a Kubernetes controller that aims to make the process of privilege escalation secure, auditable and easy for both administrators and users.
+
+{{% /blocks/lead %}}
+
+{{% blocks/lead %}}
+
+Kudo is at the moment in an early stage, under active work and very unstable. Please do not use it on production systems.
+
+{{% /blocks/lead %}}
+
+{{< blocks/section >}}
+
+{{% blocks/feature icon="fa-terminal" title="One line escalation" %}}
+
+Temporarilly getting new permissions in a cloud native context have never been easier!
+
+`kubectl kudo escalate [policy-name] [--reason] [--namespace] [--duration]`
+
+{{% /blocks/feature %}}
+
+{{% blocks/feature icon="fa-file" title="Flexible Policies" %}}
+
+Kudo [escalation policies](./) allows administrators to define fine tuned rules regarding who is allowed to escalate, how it should be approved and what an escalation grants.
+
+{{% /blocks/feature %}}
+
+{{% blocks/feature icon="fa-anchor" title="Cloud Native Privilege Escalation" %}}
+
+Kudo supports [kubernetes RBAC](https://kubernetes.io/docs/reference/access-authn-authz/rbac/) as a first class citizen, but is designed to integrate with many other systems, for example cloud providers like AWS or GCP.
+
+{{% /blocks/feature %}}
+
+{{% blocks/feature icon="fa-shield-alt" title="Escalation Challenges" %}}
+
+Some access might require aditional validation, for example having a peer review and approve your escalation.
+Kudo, based on its [escalation challenges system](./) allows to perform additional checks at runtime.
+
+{{% /blocks/feature %}}
+
+{{% blocks/feature icon="fa-eye" title="Powerful Auditability" %}}
+
+When it comes to privilege escalation, nothing must go unseen. Kudo natively pushes escalation events to Kubernetes events, but also aims to integrate with many external systems to achieve excellent auditability.
+
+{{% /blocks/feature %}}
+
+{{% blocks/feature icon="fab fa-github" title="Open Source" %}}
+
+Want to participate? Have an idea? The code source lives [on GitHub](https://github.com/jlevesy/kudo). New contributors are always welcome!
+
+{{% /blocks/feature %}}
+
+{{< /blocks/section >}}
+
+{{% blocks/lead %}}
+
+<div class="mx-auto">
+  <p class="lead mt-5">Interested in trying Kudo?</p>
+	<a class="btn btn-lg btn-primary mr-3 mb-4" href="{{< relref "/docs" >}}">
+    Check out the documentation!<i class="fas fa-arrow-alt-circle-right ml-2"></i>
+	</a>
+</div>
+
+{{% /blocks/lead %}}
