@@ -28,6 +28,14 @@ codegen:
 check_codegen: codegen
 	@git diff --exit-code
 
+.PHONY: serve_docs
+serve_docs: check_hugo
+	hugo server -s ./docs
+
+.PHONY: check_hugo
+check_hugo:
+	@hugo version >/dev/null 2>&1 || (echo "ERROR: hugo is required."; exit 1)
+
 .PHONY: run_controller_local
 run_controller_local:
 	go run ./cmd/controller -kubeconfig=${HOME}/.kube/config
