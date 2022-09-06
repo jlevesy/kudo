@@ -7,15 +7,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	watch "k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/rest"
 
+	kudov1alpha1 "github.com/jlevesy/kudo/pkg/apis/k8s.kudo.dev/v1alpha1"
 	"github.com/jlevesy/kudo/pkg/generated/clientset/versioned/scheme"
 	"github.com/jlevesy/kudo/pkg/generics"
-	"github.com/stretchr/testify/require"
 )
 
 func as[T runtime.Object](t *testing.T, obj runtime.Object) T {
@@ -25,6 +26,14 @@ func as[T runtime.Object](t *testing.T, obj runtime.Object) T {
 	}
 
 	return v
+}
+
+func assertPolicyCreated(t *testing.T, name string) *kudov1alpha1.EscalationPolicy {
+	return assertObjectCreated(t, admin.kudo.K8sV1alpha1().RESTClient(), resourceNameNamespace{
+		resource: "escalationpolicies",
+		name:     name,
+		global:   true,
+	}, 3*time.Second).(*kudov1alpha1.EscalationPolicy)
 }
 
 func assertObjectCreated(t *testing.T, client rest.Interface, resourceId resourceNameNamespace, timeout time.Duration) runtime.Object {
