@@ -46,3 +46,28 @@ webhooks:
   admissionReviewVersions: ["v1"]
   sideEffects: None
   timeoutSeconds: 5
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: "validationwebhook.k8s.kudo.dev"
+  labels:
+    {{- include "helm.labels" . | nindent 4 }}
+webhooks:
+- name: "v1alpha1.escalationpolicies.validationwebhook.k8s.kudo.dev"
+  rules:
+  - apiGroups:   ["k8s.kudo.dev"]
+    apiVersions: ["v1alpha1"]
+    operations:  ["CREATE", "UPDATE"]
+    resources:   ["escalationpolicies"]
+    scope:       "Cluster"
+  clientConfig:
+    service:
+      namespace: {{ .Release.Namespace }}
+      name: {{ include "helm.fullname" . }}
+      path: "/v1alpha1/escalationpolicies"
+      port: {{ .Values.service.port }}
+    caBundle: {{ $ca.Cert | b64enc }}
+  admissionReviewVersions: ["v1"]
+  sideEffects: None
+  timeoutSeconds: 5
