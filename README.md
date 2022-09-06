@@ -63,4 +63,4 @@ make logs_dev
 
 ### Serving The Documentation
 
-- `make serve_docs` starts a local webserver. You can then go to `https://localhost:1313` to check your local doc.
+- `make serve_docs` starts a local webserver. You can then go to `http://localhost:1313/kudo` to check your local doc.
