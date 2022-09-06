@@ -60,6 +60,8 @@ func TestEscalation_Controller_RecordsEscalationEvent(t *testing.T) {
 	_, err = admin.kudo.K8sV1alpha1().EscalationPolicies().Create(ctx, &policy, metav1.CreateOptions{})
 	require.NoError(t, err)
 
+	assertPolicyCreated(t, policy.Name)
+
 	_, err = userA.kudo.K8sV1alpha1().Escalations().Create(ctx, &escalation, metav1.CreateOptions{})
 	require.NoError(t, err)
 
@@ -193,6 +195,8 @@ func TestEscalation_Controller_DenyEscalationIfPolicyChanges(t *testing.T) {
 	gotPolicy, err := admin.kudo.K8sV1alpha1().EscalationPolicies().Create(ctx, &policy, metav1.CreateOptions{})
 	require.NoError(t, err)
 
+	assertPolicyCreated(t, gotPolicy.Name)
+
 	_, err = userA.kudo.K8sV1alpha1().Escalations().Create(ctx, &escalation, metav1.CreateOptions{})
 	require.NoError(t, err)
 
@@ -302,6 +306,8 @@ func TestEscalation_Controller_DropsPermissionsIfEscalationDeleted(t *testing.T)
 
 	_, err = admin.kudo.K8sV1alpha1().EscalationPolicies().Create(ctx, &policy, metav1.CreateOptions{})
 	require.NoError(t, err)
+	
+	assertPolicyCreated(t, policy.Name)
 
 	_, err = userA.kudo.K8sV1alpha1().Escalations().Create(ctx, &escalation, metav1.CreateOptions{})
 	require.NoError(t, err)

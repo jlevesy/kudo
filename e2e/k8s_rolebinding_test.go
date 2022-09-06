@@ -80,6 +80,8 @@ func TestEscalation_RoleBinding(t *testing.T) {
 	_, err = admin.kudo.K8sV1alpha1().EscalationPolicies().Create(ctx, &policy, metav1.CreateOptions{})
 	require.NoError(t, err)
 
+	assertPolicyCreated(t, policy.Name)
+
 	_, err = userA.kudo.K8sV1alpha1().Escalations().Create(ctx, &escalation, metav1.CreateOptions{})
 	require.NoError(t, err)
 
@@ -150,7 +152,7 @@ func TestEscalation_RoleBinding(t *testing.T) {
 	require.Error(t, err)
 }
 
-// This test proves that kudo create a role binding in the namespace asked by the user if the namespace is in the allowlist.
+// This test proves that kudo creates a role binding in the namespace asked by the user if the namespace is in the allowlist.
 func TestEscalation_RoleBinding_UserAskedNamespace(t *testing.T) {
 	t.Parallel()
 
@@ -198,7 +200,9 @@ func TestEscalation_RoleBinding_UserAskedNamespace(t *testing.T) {
 	_, err = admin.kudo.K8sV1alpha1().EscalationPolicies().Create(ctx, &policy, metav1.CreateOptions{})
 	require.NoError(t, err)
 
-	// Webhook rejects an attempt on a non authorized namespace.
+	assertPolicyCreated(t, policy.Name)
+
+	// Webhook rejects an attempt on a non-authorized namespace.
 	_, err = userA.kudo.K8sV1alpha1().Escalations().Create(ctx, &badEscalation, metav1.CreateOptions{})
 	require.Error(t, err)
 
@@ -228,7 +232,7 @@ func TestEscalation_RoleBinding_UserAskedNamespace(t *testing.T) {
 
 	assertGrantedK8sResourcesCreated(t, *gotEsc, "rolebindings")
 
-	// Now user should be allowed to be get the pods in the first test namespace.
+	// Now user should be allowed to get the pods in the first test namespace.
 	_, err = userA.k8s.CoreV1().Pods(namespace.Name).List(ctx, metav1.ListOptions{})
 	require.NoError(t, err)
 
@@ -304,6 +308,8 @@ func TestEscalation_RoleBinding_DeniedIfTamperedWith(t *testing.T) {
 
 	_, err = admin.kudo.K8sV1alpha1().EscalationPolicies().Create(ctx, &policy, metav1.CreateOptions{})
 	require.NoError(t, err)
+	
+	assertPolicyCreated(t, policy.Name)
 
 	_, err = userA.kudo.K8sV1alpha1().Escalations().Create(ctx, &escalation, metav1.CreateOptions{})
 	require.NoError(t, err)
