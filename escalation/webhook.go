@@ -178,11 +178,37 @@ func (h *WebhookHandler) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if escalation.Spec.Duration.Duration > 0 && escalation.Spec.Duration.Duration > policy.Spec.Target.MaxDuration.Duration {
+		klog.InfoS(
+			"User attempted to escalate for a duration that exceeds the maximum duration of the policy",
+			usernameAndPolicyTags(
+				review.Request.UserInfo.Username,
+				policy.Name,
+				"maxDuration",
+				policy.Spec.Target.MaxDuration,
+				"escalationDuration",
+				escalation.Spec.Duration,
+			)...,
+		)
+
+		review.Response.Result = &metav1.Status{
+			Status: metav1.StatusFailure,
+			Message: fmt.Sprintf(
+				"Wanted duration [%s] exceeds the maxium duration allowed by the policy [%s]",
+				escalation.Spec.Duration.Duration,
+				policy.Spec.Target.MaxDuration.Duration,
+			),
+		}
+
+		webhooksupport.WriteJSON(rw, http.StatusOK, &review)
+		return
+	}
+
 	for _, grant := range policy.Spec.Target.Grants {
 		granter, err := h.grantFactory.Get(grant.Kind)
 		if err != nil {
 			klog.InfoS(
-				"Refered escalation policy has a grant that is not supported",
+				"Referred escalation policy has a grant that is not supported",
 				usernameAndPolicyTags(
 					review.Request.UserInfo.Username,
 					policy.Name,
