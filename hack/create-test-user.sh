@@ -1,5 +1,8 @@
 #!/bin/bash
 
+set -e
+set -u
+
 mkdir /tmp/kudo-dev
 pushd /tmp/kudo-dev
 
@@ -12,11 +15,10 @@ kind: CertificateSigningRequest
 metadata:
   name: kudo-test-user
 spec:
-  request: $(cat ./kudo-test-user.csr | base64)
+  request: $(cat ./kudo-test-user.csr | openssl enc -A -base64)
   signerName: kubernetes.io/kube-apiserver-client
   expirationSeconds: 86400
-  usages:
-  - client auth
+  usages: ["client auth"]
 EOF
 
 kubectl certificate approve kudo-test-user
