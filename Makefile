@@ -45,7 +45,11 @@ debug_controller_local:
 	dlv debug ./cmd/controller -- -kubeconfig=${HOME}/.kube/config
 
 .PHONY: run_dev
-run_dev: preflight_check_dev create_cluster_dev deploy_dev create_test_user_dev deploy_environment_resources_dev install_kubectl_escalate_plugin_dev
+run_dev: preflight_check_dev create_cluster_dev deploy_dev create_test_user_dev wait_controller_ready_dev deploy_environment_resources_dev install_kubectl_escalate_plugin_dev
+
+.PHONY: wait_controller_ready_dev
+wait_controller_ready_dev:
+	kubectl rollout status deployment kudo-dev --timeout=90s
 
 .PHONY: deploy_crds_dev
 deploy_crds_dev:
