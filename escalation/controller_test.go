@@ -45,7 +45,7 @@ var (
 				},
 			},
 			Challenges: []kudov1alpha1.EscalationChallenge{},
-			Target: kudov1alpha1.EscalationTargetSpec{
+			Target: kudov1alpha1.EscalationTarget{
 				MaxDuration: metav1.Duration{Duration: time.Hour},
 				Grants: []kudov1alpha1.EscalationGrant{
 					{

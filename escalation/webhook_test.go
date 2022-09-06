@@ -51,7 +51,7 @@ var (
 						Name: "user-c",
 					},
 				},
-				Target: kudov1alpha1.EscalationTargetSpec{
+				Target: kudov1alpha1.EscalationTarget{
 					Grants: []kudov1alpha1.EscalationGrant{
 						{
 							Kind: testGrantKind,
@@ -79,7 +79,7 @@ var (
 						Name: "user-c",
 					},
 				},
-				Target: kudov1alpha1.EscalationTargetSpec{
+				Target: kudov1alpha1.EscalationTarget{
 					Grants: []kudov1alpha1.EscalationGrant{
 						{
 							Kind: "nonsense",

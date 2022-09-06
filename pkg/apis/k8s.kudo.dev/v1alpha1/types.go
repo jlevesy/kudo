@@ -32,7 +32,7 @@ type EscalationPolicy struct {
 type EscalationPolicySpec struct {
 	Subjects   []rbacv1.Subject      `json:"subjects"`
 	Challenges []EscalationChallenge `json:"challenges"`
-	Target     EscalationTargetSpec  `json:"target"`
+	Target     EscalationTarget      `json:"target"`
 }
 
 type EscalationChallenge struct {
@@ -40,7 +40,7 @@ type EscalationChallenge struct {
 	Reviewers []rbacv1.Subject `json:"reviewers"`
 }
 
-type EscalationTargetSpec struct {
+type EscalationTarget struct {
 	MaxDuration metav1.Duration   `json:"maxDuration"`
 	Grants      []EscalationGrant `json:"grants"`
 }
