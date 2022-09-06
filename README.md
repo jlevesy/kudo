@@ -34,7 +34,7 @@ Here's a list of tools you need to have installed to run your development enviro
 
 ### Configuration
 
-You need to have both `kudo-registry.localhost` and `kudo-e2e-registy.localhost` configured to resolve to 127.0.0.1 in your development environment.
+You need to have both `kudo-registry.localhost` and `kudo-e2e-registry.localhost` configured to resolve to 127.0.0.1 in your development environment.
 
 ### Runing the Development Environment
 
