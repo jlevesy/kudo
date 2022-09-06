@@ -29,7 +29,7 @@ func TestEscalation_Controller_RecordsEscalationEvent(t *testing.T) {
 		})
 		policy = generateEscalationPolicy(
 			t,
-			withExpiration(5*time.Second),
+			withDefaultDuration(5*time.Second),
 			withGrants(
 				kudov1alpha1.EscalationGrant{
 					Kind:              grant.K8sRoleBindingKind,
@@ -164,7 +164,7 @@ func TestEscalation_Controller_DenyEscalationIfPolicyChanges(t *testing.T) {
 		})
 		policy = generateEscalationPolicy(
 			t,
-			withExpiration(60*time.Minute), // Should not expire.
+			withDefaultDuration(60*time.Minute), // Should not expire.
 			withGrants(
 				kudov1alpha1.EscalationGrant{
 					Kind:              grant.K8sRoleBindingKind,
@@ -276,7 +276,7 @@ func TestEscalation_Controller_DropsPermissionsIfEscalationDeleted(t *testing.T)
 		})
 		policy = generateEscalationPolicy(
 			t,
-			withExpiration(60*time.Minute), // Should not expire.
+			withDefaultDuration(60*time.Minute), // Should not expire.
 			withGrants(
 				kudov1alpha1.EscalationGrant{
 					Kind:              grant.K8sRoleBindingKind,

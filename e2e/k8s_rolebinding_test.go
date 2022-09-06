@@ -278,7 +278,7 @@ func TestEscalation_RoleBinding_DeniedIfTamperedWith(t *testing.T) {
 		})
 		policy = generateEscalationPolicy(
 			t,
-			withExpiration(60*time.Minute), // Should not expire.
+			withDefaultDuration(60*time.Minute), // Should not expire.
 			withGrants(
 				kudov1alpha1.EscalationGrant{
 					Kind:             grant.K8sRoleBindingKind,
