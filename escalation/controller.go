@@ -107,7 +107,7 @@ func (c *Controller) OnAdd(ctx context.Context, escalation *kudov1alpha1.Escalat
 		return EventInsight{}, err
 	}
 
-	policy, newStatus, updated, err := c.readPolicyAndCheckExpiration(ctx, escalation)
+	policy, newStatus, updated, err := c.readPolicy(ctx, escalation)
 	if err != nil {
 		return EventInsight{}, err
 	}
@@ -167,7 +167,7 @@ func (c *Controller) OnDelete(ctx context.Context, esc *kudov1alpha1.Escalation)
 func (c *Controller) reconcileState(ctx context.Context, newEsc *kudov1alpha1.Escalation) (kudov1alpha1.EscalationStatus, error) {
 	switch newEsc.Status.State {
 	case kudov1alpha1.StatePending:
-		policy, newStatus, updated, err := c.readPolicyAndCheckExpiration(ctx, newEsc)
+		policy, newStatus, updated, err := c.readPolicy(ctx, newEsc)
 		if err != nil {
 			return statusZero, err
 		}
@@ -185,15 +185,29 @@ func (c *Controller) reconcileState(ctx context.Context, newEsc *kudov1alpha1.Es
 
 		// Policies challenges will be evaluated here.
 
+		// Compute expires at, now that the escalation is accepted.
+		duration := newEsc.Spec.Duration
+		if duration.Duration == 0 {
+			duration = policy.Spec.Target.DefaultDuration
+		}
+
 		// if ok, transition to accepted.
 		return newEsc.Status.TransitionTo(
 			kudov1alpha1.StateAccepted,
-			kudov1alpha1.WithExpiresAt(c.nowFunc().Add(policy.Spec.Target.MaxDuration.Duration)),
+			kudov1alpha1.WithExpiresAt(c.nowFunc().Add(duration.Duration)),
 			kudov1alpha1.WithDetails(AcceptedInProgressStateDetails),
 		), nil
 
 	case kudov1alpha1.StateAccepted:
-		policy, newStatus, updated, err := c.readPolicyAndCheckExpiration(ctx, newEsc)
+		// Is the escalation already expired? If so, transition its state and abort.
+		if c.nowFunc().After(newEsc.Status.ExpiresAt.Time) {
+			return newEsc.Status.TransitionTo(
+				kudov1alpha1.StateExpired,
+				kudov1alpha1.WithDetails(ExpiredStateDetails),
+			), nil
+		}
+
+		policy, newStatus, updated, err := c.readPolicy(ctx, newEsc)
 		if err != nil {
 			return statusZero, err
 		}
@@ -346,7 +360,7 @@ func (h *Controller) reclaimGrants(ctx context.Context, esc *kudov1alpha1.Escala
 	return grantRefs, nil
 }
 
-func (c *Controller) readPolicyAndCheckExpiration(ctx context.Context, esc *kudov1alpha1.Escalation) (*kudov1alpha1.EscalationPolicy, kudov1alpha1.EscalationStatus, bool, error) {
+func (c *Controller) readPolicy(ctx context.Context, esc *kudov1alpha1.Escalation) (*kudov1alpha1.EscalationPolicy, kudov1alpha1.EscalationStatus, bool, error) {
 	// Does the referenced policy exists?
 	policy, err := c.policiesGetter.Get(esc.Spec.PolicyName)
 	switch {
@@ -361,20 +375,8 @@ func (c *Controller) readPolicyAndCheckExpiration(ctx context.Context, esc *kudo
 	case err != nil:
 		return nil, statusZero, false, err
 	default:
+		return policy, statusZero, false, nil
 	}
-
-	// Is the escalation already expired? If so, transition its state and abort.
-	if c.nowFunc().After(esc.CreationTimestamp.Add(policy.Spec.Target.MaxDuration.Duration)) {
-		return nil,
-			esc.Status.TransitionTo(
-				kudov1alpha1.StateExpired,
-				kudov1alpha1.WithDetails(ExpiredStateDetails),
-			),
-			true,
-			nil
-	}
-
-	return policy, statusZero, false, nil
 }
 
 func (c *Controller) updateStatus(ctx context.Context, escalation *kudov1alpha1.Escalation, status kudov1alpha1.EscalationStatus) (*kudov1alpha1.Escalation, error) {
