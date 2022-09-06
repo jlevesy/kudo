@@ -8,7 +8,7 @@
 &lt;p>Kudo has no release yet so we can&amp;rsquo;t properly document this.&lt;/p>
 &lt;h3 id="installing-the-controller">Installing the Controller&lt;/h3>
 &lt;p>This will probably look like &lt;code>helm install -f values.yaml -n kudo kudo/kudo-controller kudo-controller&lt;/code>&lt;/p>
-&lt;p>We need ot mention here:&lt;/p>
+&lt;p>We need to mention here:&lt;/p>
 &lt;ul>
 &lt;li>A cert is generated in the helm chart, so people need to be cautious about this. We also need to provide a way of refreshing the cert (I&amp;rsquo;m thinking helm template only the cert file, but this needs to be tested.)&lt;/li>
 &lt;/ul>
