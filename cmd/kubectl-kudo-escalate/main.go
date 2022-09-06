@@ -42,6 +42,7 @@ Find more information at:
 
 	cmd.Flags().BoolVar(&config.noWait, "no-wait", false, "do not wait for escalation to be accepted, or denied")
 	cmd.Flags().DurationVar(&config.duration, "duration", 0, "escalate for the given duration, defaults to the policy default duration")
+	cmd.Flags().StringVar(&config.reason, "reason", "", "reason for the escalation (required)")
 	config.ConfigFlags.AddFlags(cmd.Flags())
 
 	return &cmd
@@ -51,6 +52,7 @@ type runEscalateCfg struct {
 	*genericclioptions.ConfigFlags
 	noWait   bool
 	duration time.Duration
+	reason   string
 }
 
 func runEscalate(cmd *cobra.Command, config runEscalateCfg, args []string) error {
@@ -79,7 +81,7 @@ func runEscalate(cmd *cobra.Command, config runEscalateCfg, args []string) error
 			},
 			Spec: kudov1alpha1.EscalationSpec{
 				PolicyName: parsedArgs.policyName,
-				Reason:     parsedArgs.reason,
+				Reason:     config.reason,
 				Namespace:  *config.ConfigFlags.Namespace,
 				Duration:   metav1.Duration{Duration: config.duration},
 			},
@@ -151,26 +153,19 @@ func runEscalate(cmd *cobra.Command, config runEscalateCfg, args []string) error
 
 type escalateArgs struct {
 	policyName string
-	reason     string
 }
 
 func parseArgs(args []string) (escalateArgs, error) {
-
-	if len(args) < 2 {
-		return escalateArgs{}, errors.New("you need to provide a policy name and a reason")
+	if len(args) < 1 {
+		return escalateArgs{}, errors.New("you need to provide a policy name")
 	}
 
 	parsedArgs := escalateArgs{
 		policyName: args[0],
-		reason:     strings.Join(args[1:], " "),
 	}
 
 	if strings.TrimSpace(parsedArgs.policyName) == "" {
 		return escalateArgs{}, errors.New("you need to provide a non blank policy name")
-	}
-
-	if strings.TrimSpace(parsedArgs.reason) == "" {
-		return escalateArgs{}, errors.New("you need to provide a non blank reason")
 	}
 
 	return parsedArgs, nil

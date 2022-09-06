@@ -16,8 +16,8 @@ func TestParseArges(t *testing.T) {
 	}{
 		{
 			desc:    "raises an error if not enough args",
-			rawArgs: []string{"not-enough"},
-			wantErr: errors.New("you need to provide a policy name and a reason"),
+			rawArgs: []string{},
+			wantErr: errors.New("you need to provide a policy name"),
 		},
 		{
 			desc:    "raises an error if policy name is blank",
@@ -25,24 +25,10 @@ func TestParseArges(t *testing.T) {
 			wantErr: errors.New("you need to provide a non blank policy name"),
 		},
 		{
-			desc:    "raises an error if reason is blank",
-			rawArgs: []string{"policyyyy", " "},
-			wantErr: errors.New("you need to provide a non blank reason"),
-		},
-		{
 			desc:    "parse args",
-			rawArgs: []string{"policy", "reason"},
+			rawArgs: []string{"policy"},
 			wantArgs: escalateArgs{
 				policyName: "policy",
-				reason:     "reason",
-			},
-		},
-		{
-			desc:    "concat args into reaso",
-			rawArgs: []string{"policy", "reason", "with", "more", "elaboration"},
-			wantArgs: escalateArgs{
-				policyName: "policy",
-				reason:     "reason with more elaboration",
 			},
 		},
 	}
