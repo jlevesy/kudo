@@ -63,7 +63,7 @@ spec:
                 target:
                   type: object
                   properties:
-                    duration:
+                    maxDuration:
                       type: string
                     grants:
                       type: array

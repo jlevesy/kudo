@@ -188,7 +188,7 @@ func (c *Controller) reconcileState(ctx context.Context, newEsc *kudov1alpha1.Es
 		// if ok, transition to accepted.
 		return newEsc.Status.TransitionTo(
 			kudov1alpha1.StateAccepted,
-			kudov1alpha1.WithExpiresAt(c.nowFunc().Add(policy.Spec.Target.Duration.Duration)),
+			kudov1alpha1.WithExpiresAt(c.nowFunc().Add(policy.Spec.Target.MaxDuration.Duration)),
 			kudov1alpha1.WithDetails(AcceptedInProgressStateDetails),
 		), nil
 
@@ -364,7 +364,7 @@ func (c *Controller) readPolicyAndCheckExpiration(ctx context.Context, esc *kudo
 	}
 
 	// Is the escalation already expired? If so, transition its state and abort.
-	if c.nowFunc().After(esc.CreationTimestamp.Add(policy.Spec.Target.Duration.Duration)) {
+	if c.nowFunc().After(esc.CreationTimestamp.Add(policy.Spec.Target.MaxDuration.Duration)) {
 		return nil,
 			esc.Status.TransitionTo(
 				kudov1alpha1.StateExpired,

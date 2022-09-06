@@ -46,7 +46,7 @@ var (
 			},
 			Challenges: []kudov1alpha1.EscalationChallenge{},
 			Target: kudov1alpha1.EscalationTargetSpec{
-				Duration: metav1.Duration{Duration: time.Hour},
+				MaxDuration: metav1.Duration{Duration: time.Hour},
 				Grants: []kudov1alpha1.EscalationGrant{
 					{
 						Kind:             testGrantKind,
@@ -327,7 +327,7 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 				PolicyVersion: testPolicy.ResourceVersion,
 				ExpiresAt: metav1.Time{
 					Time: now.Add(
-						testPolicy.Spec.Target.Duration.Duration,
+						testPolicy.Spec.Target.MaxDuration.Duration,
 					),
 				},
 			},

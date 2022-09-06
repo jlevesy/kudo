@@ -41,8 +41,8 @@ type EscalationChallenge struct {
 }
 
 type EscalationTargetSpec struct {
-	Duration metav1.Duration   `json:"duration"`
-	Grants   []EscalationGrant `json:"grants"`
+	MaxDuration metav1.Duration   `json:"maxDuration"`
+	Grants      []EscalationGrant `json:"grants"`
 }
 
 type EscalationGrant struct {
