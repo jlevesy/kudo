@@ -85,10 +85,11 @@ func (e *Escalation) AsOwnerRef() metav1.OwnerReference {
 }
 
 type EscalationSpec struct {
-	PolicyName string `json:"policyName"`
-	Requestor  string `json:"requestor"`
-	Reason     string `json:"reason"`
-	Namespace  string `json:"namespace"`
+	PolicyName string          `json:"policyName"`
+	Requestor  string          `json:"requestor"`
+	Reason     string          `json:"reason"`
+	Namespace  string          `json:"namespace"`
+	Duration   metav1.Duration `json:"duration"`
 }
 
 func (e *EscalationSpec) IsValid() bool {

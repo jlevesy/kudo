@@ -33,6 +33,8 @@ spec:
                   type: string
                 namespace:
                   type: string
+                duration:
+                  type: string
               required:
                 - policyName
                 - reason
