@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,6 +41,7 @@ Find more information at:
 	}
 
 	cmd.Flags().BoolVar(&config.noWait, "no-wait", false, "do not wait for escalation to be accepted, or denied")
+	cmd.Flags().DurationVar(&config.duration, "duration", 0, "escalate for the given duration, defaults to the policy default duration")
 	config.ConfigFlags.AddFlags(cmd.Flags())
 
 	return &cmd
@@ -47,7 +49,8 @@ Find more information at:
 
 type runEscalateCfg struct {
 	*genericclioptions.ConfigFlags
-	noWait bool
+	noWait   bool
+	duration time.Duration
 }
 
 func runEscalate(cmd *cobra.Command, config runEscalateCfg, args []string) error {
@@ -78,6 +81,7 @@ func runEscalate(cmd *cobra.Command, config runEscalateCfg, args []string) error
 				PolicyName: parsedArgs.policyName,
 				Reason:     parsedArgs.reason,
 				Namespace:  *config.ConfigFlags.Namespace,
+				Duration:   metav1.Duration{Duration: config.duration},
 			},
 		},
 		metav1.CreateOptions{},
