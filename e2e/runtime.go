@@ -244,6 +244,8 @@ func installKudo(ctx context.Context, kubeConfigPath string) error {
 				"--set=image.devRef=" + imageRef,
 				"--set=controller.resyncInterval=5s",
 				"--set=controller.retryInterval=1s",
+				"--set=resources.limits.cpu=1",
+				"--set=resources.requests.cpu=1",
 				"--wait",
 				"--timeout=1m",
 				"kudo-e2e",
