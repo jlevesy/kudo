@@ -45,7 +45,7 @@ jobs:
           check-latest: true
           cache: true
       - name: Install google/ko
-        uses: imjasonh/setup-ko@v0.5
+        uses: imjasonh/setup-ko@v0.6
       - name: Install helm
         uses: azure/setup-helm@v3
         with:
