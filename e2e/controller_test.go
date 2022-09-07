@@ -15,6 +15,123 @@ import (
 	kudov1alpha1 "github.com/jlevesy/kudo/pkg/apis/k8s.kudo.dev/v1alpha1"
 )
 
+// This test makes sure that users can ask escalation with custom durations.
+func TestEscalation_Controller_UsesEscalationDuration(t *testing.T) {
+	t.Parallel()
+
+	var (
+		// As the user asks for an escalation that goes for 5 seconds, if this test isn't done within 20 seconds,
+		// then we should consider it as failed.
+		ctx, cancel = context.WithTimeout(context.Background(), 20*time.Second)
+		namespace   = generateNamespace(t, 0)
+		role        = generateRole(t, 0, namespace.Name, rbacv1.PolicyRule{
+			Verbs:     []string{"list"},
+			APIGroups: []string{""},
+			Resources: []string{"pods"},
+		})
+		policy = generateEscalationPolicy(
+			t,
+			withDefaultDuration(90*time.Second),
+			withMaxDuration(100*time.Second),
+			withGrants(
+				kudov1alpha1.EscalationGrant{
+					Kind:              grant.K8sRoleBindingKind,
+					AllowedNamespaces: []string{namespace.Name},
+					RoleRef: rbacv1.RoleRef{
+						Kind: "Role",
+						Name: role.Name,
+					},
+				},
+			),
+		)
+
+		escalation = generateEscalation(
+			t,
+			policy.Name,
+			withNamespace(namespace.Name),
+			withDuration(5*time.Second),
+		)
+
+		exceedingMaxTimeEscalation = generateEscalation(
+			t,
+			policy.Name,
+			withNamespace(namespace.Name),
+			withDuration(120*time.Second),
+		)
+
+		err error
+	)
+
+	defer cancel()
+
+	_, err = admin.k8s.CoreV1().Namespaces().Create(ctx, &namespace, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	_, err = admin.k8s.RbacV1().Roles(namespace.Name).Create(
+		ctx,
+		&role,
+		metav1.CreateOptions{},
+	)
+	require.NoError(t, err)
+
+	_, err = admin.kudo.K8sV1alpha1().EscalationPolicies().Create(ctx, &policy, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	assertPolicyCreated(t, policy.Name)
+
+	// The escalation exceeding max time should be rejected.
+	_, err = userA.kudo.K8sV1alpha1().Escalations().Create(ctx, &exceedingMaxTimeEscalation, metav1.CreateOptions{})
+	require.Error(t, err)
+
+	_, err = userA.kudo.K8sV1alpha1().Escalations().Create(ctx, &escalation, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	// admin waits for escalation to reach state ACCEPTED, and grants are created
+	rawEsc := assertObjectUpdated(
+		t,
+		admin.kudo.K8sV1alpha1().RESTClient(),
+		resourceNameNamespace{
+			resource: "escalations",
+			name:     escalation.Name,
+			global:   true,
+		},
+		condEscalationStatusMatchesSpec(
+			escalationWaitCondSpec{
+				state: kudov1alpha1.StateAccepted,
+				grantStatuses: []kudov1alpha1.GrantStatus{
+					kudov1alpha1.GrantStatusCreated,
+				},
+			},
+		),
+		30*time.Second,
+	)
+
+	gotEsc := as[*kudov1alpha1.Escalation](t, rawEsc)
+
+	// After a while, escalation expires.
+	assertObjectUpdated(
+		t,
+		admin.kudo.K8sV1alpha1().RESTClient(),
+		resourceNameNamespace{
+			resource: "escalations",
+			name:     escalation.Name,
+			global:   true,
+		},
+		condEscalationStatusMatchesSpec(
+			escalationWaitCondSpec{
+				state: kudov1alpha1.StateExpired,
+				grantStatuses: []kudov1alpha1.GrantStatus{
+					kudov1alpha1.GrantStatusReclaimed,
+				},
+			},
+		),
+		30*time.Second,
+	)
+
+	// Bindings are reclaimed.
+	assertGrantedK8sResourcesDeleted(t, *gotEsc, "rolebindings")
+}
+
 // This test makes sure that audit events are properly recorded for an escalation.
 func TestEscalation_Controller_RecordsEscalationEvent(t *testing.T) {
 	t.Parallel()
@@ -306,7 +423,7 @@ func TestEscalation_Controller_DropsPermissionsIfEscalationDeleted(t *testing.T)
 
 	_, err = admin.kudo.K8sV1alpha1().EscalationPolicies().Create(ctx, &policy, metav1.CreateOptions{})
 	require.NoError(t, err)
-	
+
 	assertPolicyCreated(t, policy.Name)
 
 	_, err = userA.kudo.K8sV1alpha1().Escalations().Create(ctx, &escalation, metav1.CreateOptions{})

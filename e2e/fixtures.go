@@ -61,6 +61,12 @@ func withDefaultDuration(duration time.Duration) escalationPolicyOption {
 	}
 }
 
+func withMaxDuration(duration time.Duration) escalationPolicyOption {
+	return func(p *kudov1alpha1.EscalationPolicy) {
+		p.Spec.Target.MaxDuration = metav1.Duration{Duration: duration}
+	}
+}
+
 func generateEscalationPolicy(t *testing.T, opts ...escalationPolicyOption) kudov1alpha1.EscalationPolicy {
 	t.Helper()
 
@@ -94,6 +100,12 @@ type escalationOption func(e *kudov1alpha1.Escalation)
 func withNamespace(ns string) escalationOption {
 	return func(e *kudov1alpha1.Escalation) {
 		e.Spec.Namespace = ns
+	}
+}
+
+func withDuration(duration time.Duration) escalationOption {
+	return func(e *kudov1alpha1.Escalation) {
+		e.Spec.Duration.Duration = duration
 	}
 }
 
