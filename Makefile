@@ -97,7 +97,7 @@ run_escalation_dev: use_test_user_dev apply_escalation_dev use_admin_user_dev
 apply_escalation_dev:
 	kubectl kudo escalate \
 		rbac-escalation-policy-example \
-		"Needs access to squad-b namespace to debug my service"
+		--reason "Needs access to squad-b namespace to debug my service"
 
 .PHONY: use_admin_user_dev
 use_admin_user_dev:
