@@ -43,7 +43,8 @@ spec:
         - kind: Group
           name: admin@my-company.io
   target:
-    duration: 60m
+    defaultDuration: 60m
+    maxDuration: 4h
     grants:
     - kind: KubernetesRoleBinding
       defaultNamespace: application-a
@@ -62,7 +63,7 @@ Let's review the configuration, This [EscalationPolicy](../concepts#escalation-p
 - The `challenges` sections tells that an escalation using this policy must be approved by one member of the group `admin@my-company.io`
 - The `target` sections defines what the escalation actually grants:
   - Kudo will create a `RoleBinding` between the requestor and the role `port-forwarder` by default in the `application-a` namespace, but is allowed to be used in the `application-a` and `application-b` namespace.
-  - The escalation will last 60 minutes.
+  - The escalation lasts 60 minutes by default, but users can ask up to 4h.
 
 From there, you can escalate using this policy using kudo kubectl plugin:
 

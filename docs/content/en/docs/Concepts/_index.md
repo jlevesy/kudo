@@ -34,7 +34,8 @@ spec:
         - kind: Group
           name: squad-b@voiapp.io
   target: # (required) what the escalation grants
-    duration: 60m
+    defaultDuration: 60m
+    maxDuration: 2h
     grants:
     - kind: KubernetesRoleBinding
       defaultNamespace: some-app
@@ -58,6 +59,7 @@ It is composed by the following attributes:
   - `requestor`: identifier of the user asking for permission escalation
   - `reason`: a reason to explain why the user is asking to escalate their permissions
   - `namespace`: (optional) a namespace requested by the user.
+  - `duration`: (optional) how much time the escalation should last.
 
 - `status`: current status of the escalation:
   - `state`:
@@ -80,6 +82,7 @@ spec:
   policyName: rbac-escalation-exaple
   requestor: user-1@kubecluster.com
   reason: "Needs access to squad-b namespace to debug my service"
+  duration: 2h
 status:
   state: "ACCEPTED"
   stateDetails: "Escalation accepted, all resources are created"
