@@ -20,6 +20,7 @@ import (
 
 	"github.com/jlevesy/kudo/audit"
 	"github.com/jlevesy/kudo/escalation"
+	"github.com/jlevesy/kudo/escalationpolicy"
 	"github.com/jlevesy/kudo/grant"
 	kudov1alpha1 "github.com/jlevesy/kudo/pkg/apis/k8s.kudo.dev/v1alpha1"
 	"github.com/jlevesy/kudo/pkg/controllersupport"
@@ -108,11 +109,22 @@ func main() {
 			kudov1alpha1.KindEscalation,
 			threadiness,
 		)
-		escalationWebhookHandler = escalation.NewWebhookHandler(policiesLister, granterFactory)
+		escalationReviewer = escalation.NewAdmissionReviewer(policiesLister, granterFactory)
 	)
 
 	escalationsInformer.AddEventHandler(escalationController)
-	serveMux.Handle("/v1alpha1/escalations", webhooksupport.MustPost(escalationWebhookHandler))
+	serveMux.Handle(
+		"/v1alpha1/escalationpolicies",
+		webhooksupport.NewHandler(
+			escalationpolicy.NewAdmissionReviewer(),
+		),
+	)
+	serveMux.Handle(
+		"/v1alpha1/escalations",
+		webhooksupport.NewHandler(
+			escalationReviewer,
+		),
+	)
 	serveMux.HandleFunc("/healthz", func(rw http.ResponseWriter, r *http.Request) {
 		rw.WriteHeader(http.StatusOK)
 		_, _ = rw.Write([]byte("ok"))

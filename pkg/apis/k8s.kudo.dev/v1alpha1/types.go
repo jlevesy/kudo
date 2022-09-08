@@ -32,7 +32,7 @@ type EscalationPolicy struct {
 type EscalationPolicySpec struct {
 	Subjects   []rbacv1.Subject      `json:"subjects"`
 	Challenges []EscalationChallenge `json:"challenges"`
-	Target     EscalationTargetSpec  `json:"target"`
+	Target     EscalationTarget      `json:"target"`
 }
 
 type EscalationChallenge struct {
@@ -40,9 +40,10 @@ type EscalationChallenge struct {
 	Reviewers []rbacv1.Subject `json:"reviewers"`
 }
 
-type EscalationTargetSpec struct {
-	Duration metav1.Duration   `json:"duration"`
-	Grants   []EscalationGrant `json:"grants"`
+type EscalationTarget struct {
+	DefaultDuration metav1.Duration   `json:"defaultDuration"`
+	MaxDuration     metav1.Duration   `json:"maxDuration"`
+	Grants          []EscalationGrant `json:"grants"`
 }
 
 type EscalationGrant struct {
@@ -85,10 +86,11 @@ func (e *Escalation) AsOwnerRef() metav1.OwnerReference {
 }
 
 type EscalationSpec struct {
-	PolicyName string `json:"policyName"`
-	Requestor  string `json:"requestor"`
-	Reason     string `json:"reason"`
-	Namespace  string `json:"namespace"`
+	PolicyName string          `json:"policyName"`
+	Requestor  string          `json:"requestor"`
+	Reason     string          `json:"reason"`
+	Namespace  string          `json:"namespace"`
+	Duration   metav1.Duration `json:"duration"`
 }
 
 func (e *EscalationSpec) IsValid() bool {

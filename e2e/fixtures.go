@@ -55,9 +55,15 @@ func withGrants(grants ...kudov1alpha1.EscalationGrant) escalationPolicyOption {
 	}
 }
 
-func withExpiration(duration time.Duration) escalationPolicyOption {
+func withDefaultDuration(duration time.Duration) escalationPolicyOption {
 	return func(p *kudov1alpha1.EscalationPolicy) {
-		p.Spec.Target.Duration = metav1.Duration{Duration: duration}
+		p.Spec.Target.DefaultDuration = metav1.Duration{Duration: duration}
+	}
+}
+
+func withMaxDuration(duration time.Duration) escalationPolicyOption {
+	return func(p *kudov1alpha1.EscalationPolicy) {
+		p.Spec.Target.MaxDuration = metav1.Duration{Duration: duration}
 	}
 }
 
@@ -75,8 +81,9 @@ func generateEscalationPolicy(t *testing.T, opts ...escalationPolicyOption) kudo
 					Name: userA.userName,
 				},
 			},
-			Target: kudov1alpha1.EscalationTargetSpec{
-				Duration: metav1.Duration{Duration: 5 * time.Second},
+			Target: kudov1alpha1.EscalationTarget{
+				DefaultDuration: metav1.Duration{Duration: 5 * time.Second},
+				MaxDuration:     metav1.Duration{Duration: 1000 * time.Hour},
 			},
 		},
 	}
@@ -93,6 +100,12 @@ type escalationOption func(e *kudov1alpha1.Escalation)
 func withNamespace(ns string) escalationOption {
 	return func(e *kudov1alpha1.Escalation) {
 		e.Spec.Namespace = ns
+	}
+}
+
+func withDuration(duration time.Duration) escalationOption {
+	return func(e *kudov1alpha1.Escalation) {
+		e.Spec.Duration.Duration = duration
 	}
 }
 

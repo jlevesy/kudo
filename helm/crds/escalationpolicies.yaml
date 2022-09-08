@@ -63,7 +63,9 @@ spec:
                 target:
                   type: object
                   properties:
-                    duration:
+                    defaultDuration:
+                      type: string
+                    maxDuration:
                       type: string
                     grants:
                       type: array

@@ -45,8 +45,8 @@ var (
 				},
 			},
 			Challenges: []kudov1alpha1.EscalationChallenge{},
-			Target: kudov1alpha1.EscalationTargetSpec{
-				Duration: metav1.Duration{Duration: time.Hour},
+			Target: kudov1alpha1.EscalationTarget{
+				DefaultDuration: metav1.Duration{Duration: time.Hour},
 				Grants: []kudov1alpha1.EscalationGrant{
 					{
 						Kind:             testGrantKind,
@@ -276,29 +276,6 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 			},
 		},
 		{
-			desc:     "on pending state, transitions to expired if escalation lifetime exceeds policy duration",
-			kudoSeed: []runtime.Object{&testPolicy},
-			updatedEscalation: kudov1alpha1.Escalation{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:              "test-escalation",
-					CreationTimestamp: expiredCreationTimestamp,
-				},
-				Spec: kudov1alpha1.EscalationSpec{
-					PolicyName: testPolicy.Name,
-				},
-				Status: kudov1alpha1.EscalationStatus{
-					State:     kudov1alpha1.StatePending,
-					GrantRefs: []kudov1alpha1.EscalationGrantRef{{}},
-				},
-			},
-			wantNextResync: retryDelay,
-			wantEscalationStatus: kudov1alpha1.EscalationStatus{
-				State:        kudov1alpha1.StateExpired,
-				StateDetails: escalation.ExpiredStateDetails,
-				GrantRefs:    []kudov1alpha1.EscalationGrantRef{{}},
-			},
-		},
-		{
 			desc:     "on pending state, transitions to accepted if all good",
 			kudoSeed: []runtime.Object{&testPolicy},
 			updatedEscalation: kudov1alpha1.Escalation{
@@ -327,8 +304,41 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 				PolicyVersion: testPolicy.ResourceVersion,
 				ExpiresAt: metav1.Time{
 					Time: now.Add(
-						testPolicy.Spec.Target.Duration.Duration,
+						testPolicy.Spec.Target.DefaultDuration.Duration,
 					),
+				},
+			},
+		},
+		{
+			desc:     "on pending state, sets to updated according to escalation duration",
+			kudoSeed: []runtime.Object{&testPolicy},
+			updatedEscalation: kudov1alpha1.Escalation{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-escalation",
+					CreationTimestamp: metav1.Time{
+						Time: creationTimestamp,
+					},
+				},
+				Spec: kudov1alpha1.EscalationSpec{
+					PolicyName: testPolicy.Name,
+					Duration:   metav1.Duration{Duration: 2 * time.Second},
+				},
+				Status: kudov1alpha1.EscalationStatus{
+					State:         kudov1alpha1.StatePending,
+					GrantRefs:     []kudov1alpha1.EscalationGrantRef{{}},
+					PolicyUID:     testPolicy.UID,
+					PolicyVersion: testPolicy.ResourceVersion,
+				},
+			},
+			wantNextResync: retryDelay,
+			wantEscalationStatus: kudov1alpha1.EscalationStatus{
+				State:         kudov1alpha1.StateAccepted,
+				StateDetails:  escalation.AcceptedInProgressStateDetails,
+				GrantRefs:     []kudov1alpha1.EscalationGrantRef{{}},
+				PolicyUID:     testPolicy.UID,
+				PolicyVersion: testPolicy.ResourceVersion,
+				ExpiresAt: metav1.Time{
+					Time: now.Add(2 * time.Second),
 				},
 			},
 		},
@@ -348,6 +358,9 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 				Status: kudov1alpha1.EscalationStatus{
 					State:     kudov1alpha1.StateAccepted,
 					GrantRefs: []kudov1alpha1.EscalationGrantRef{{}},
+					ExpiresAt: metav1.Time{
+						Time: now.Add(50 * time.Second),
+					},
 				},
 			},
 			wantNextResync: retryDelay,
@@ -355,10 +368,13 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 				State:        kudov1alpha1.StateDenied,
 				StateDetails: escalation.DeniedPolicyNotFoundStateDetails,
 				GrantRefs:    []kudov1alpha1.EscalationGrantRef{{}},
+				ExpiresAt: metav1.Time{
+					Time: now.Add(50 * time.Second),
+				},
 			},
 		},
 		{
-			desc:     "on accepted state, transitions to expired if escalation lifetime exceeds policy duration",
+			desc:     "on accepted state, transitions to expired if now is after expires at",
 			kudoSeed: []runtime.Object{&testPolicy},
 			updatedEscalation: kudov1alpha1.Escalation{
 				ObjectMeta: metav1.ObjectMeta{
@@ -371,6 +387,9 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 				Status: kudov1alpha1.EscalationStatus{
 					State:     kudov1alpha1.StateAccepted,
 					GrantRefs: []kudov1alpha1.EscalationGrantRef{{}},
+					ExpiresAt: metav1.Time{
+						Time: now.Add(-50 * time.Second),
+					},
 				},
 			},
 			wantNextResync: retryDelay,
@@ -378,6 +397,9 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 				State:        kudov1alpha1.StateExpired,
 				StateDetails: escalation.ExpiredStateDetails,
 				GrantRefs:    []kudov1alpha1.EscalationGrantRef{{}},
+				ExpiresAt: metav1.Time{
+					Time: now.Add(-50 * time.Second),
+				},
 			},
 		},
 		{
@@ -398,6 +420,9 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 					GrantRefs:     []kudov1alpha1.EscalationGrantRef{{}},
 					PolicyUID:     testPolicy.UID,
 					PolicyVersion: testPolicy.ResourceVersion + "4444",
+					ExpiresAt: metav1.Time{
+						Time: now.Add(50 * time.Second),
+					},
 				},
 			},
 			wantNextResync: retryDelay,
@@ -407,6 +432,9 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 				PolicyUID:     testPolicy.UID,
 				PolicyVersion: testPolicy.ResourceVersion + "4444",
 				GrantRefs:     []kudov1alpha1.EscalationGrantRef{{}},
+				ExpiresAt: metav1.Time{
+					Time: now.Add(50 * time.Second),
+				},
 			},
 		},
 		{
@@ -427,6 +455,9 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 					GrantRefs:     []kudov1alpha1.EscalationGrantRef{{}},
 					PolicyUID:     testPolicy.UID + "33333",
 					PolicyVersion: testPolicy.ResourceVersion,
+					ExpiresAt: metav1.Time{
+						Time: now.Add(50 * time.Second),
+					},
 				},
 			},
 			wantNextResync: retryDelay,
@@ -436,6 +467,9 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 				PolicyUID:     testPolicy.UID + "33333",
 				PolicyVersion: testPolicy.ResourceVersion,
 				GrantRefs:     []kudov1alpha1.EscalationGrantRef{{}},
+				ExpiresAt: metav1.Time{
+					Time: now.Add(50 * time.Second),
+				},
 			},
 		},
 		{
@@ -592,6 +626,9 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 					PolicyName: testPolicy.Name,
 				},
 				Status: kudov1alpha1.EscalationStatus{
+					ExpiresAt: metav1.Time{
+						Time: now.Add(50 * time.Second),
+					},
 					State:         kudov1alpha1.StateAccepted,
 					PolicyUID:     testPolicy.UID,
 					PolicyVersion: testPolicy.ResourceVersion,
@@ -606,6 +643,9 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 			},
 			wantNextResync: retryDelay,
 			wantEscalationStatus: kudov1alpha1.EscalationStatus{
+				ExpiresAt: metav1.Time{
+					Time: now.Add(50 * time.Second),
+				},
 				State:         kudov1alpha1.StateDenied,
 				StateDetails:  "Escalation has been denied, reason is: kudo managed resource has been tampered with",
 				PolicyUID:     testPolicy.UID,
