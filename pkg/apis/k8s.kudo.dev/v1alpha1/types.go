@@ -41,15 +41,12 @@ type EscalationChallenge struct {
 }
 
 type EscalationTarget struct {
-	DefaultDuration metav1.Duration   `json:"defaultDuration"`
-	MaxDuration     metav1.Duration   `json:"maxDuration"`
-	Grants          []EscalationGrant `json:"grants"`
+	DefaultDuration metav1.Duration `json:"defaultDuration"`
+	MaxDuration     metav1.Duration `json:"maxDuration"`
+	Grants          []ValueWithKind `json:"grants"`
 }
 
-type EscalationGrant struct {
-	Kind string `json:"kind"`
-
-	// K8sRoleBinding configuration.
+type K8sRoleBindingGrant struct {
 	DefaultNamespace  string         `json:"defaultNamespace"`
 	AllowedNamespaces []string       `json:"allowedNamespaces"`
 	RoleRef           rbacv1.RoleRef `json:"roleRef"`
@@ -187,12 +184,15 @@ const (
 )
 
 type EscalationGrantRef struct {
-	Kind            string      `json:"kind"`
-	Name            string      `json:"name"`
-	Namespace       string      `json:"namespace"`
-	UID             types.UID   `json:"uid"`
-	ResourceVersion string      `json:"resourceVersion"`
-	Status          GrantStatus `json:"status"`
+	Status GrantStatus   `json:"status"`
+	Ref    ValueWithKind `json:"ref"`
+}
+
+type K8sRoleBindingGrantRef struct {
+	Name            string    `json:"name"`
+	Namespace       string    `json:"namespace"`
+	UID             types.UID `json:"uid"`
+	ResourceVersion string    `json:"resourceVersion"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
