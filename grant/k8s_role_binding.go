@@ -12,6 +12,7 @@ import (
 	rbacv1listers "k8s.io/client-go/listers/rbac/v1"
 	"k8s.io/klog/v2"
 
+	"github.com/jlevesy/kudo/pkg/apis/k8s.kudo.dev/v1alpha1"
 	kudov1alpha1 "github.com/jlevesy/kudo/pkg/apis/k8s.kudo.dev/v1alpha1"
 	"github.com/jlevesy/kudo/pkg/generics"
 )
@@ -42,24 +43,35 @@ func newK8sRoleBindingGranter(rbacClient rbacv1client.RbacV1Interface, rbacListe
 	}, nil
 }
 
-func (g *k8sRoleBindingGranter) Create(ctx context.Context, esc *kudov1alpha1.Escalation, grant kudov1alpha1.EscalationGrant) (kudov1alpha1.EscalationGrantRef, error) {
-	roleBinding, err := g.findRoleBinding(esc, grant)
+func (g *k8sRoleBindingGranter) Create(ctx context.Context, esc *kudov1alpha1.Escalation, grant kudov1alpha1.ValueWithKind) (kudov1alpha1.EscalationGrantRef, error) {
+	k8sGrant, err := kudov1alpha1.DecodeValueWithKind[kudov1alpha1.K8sRoleBindingGrant](grant)
+	if err != nil {
+		return kudov1alpha1.EscalationGrantRef{}, err
+	}
+
+	roleBinding, err := g.findRoleBinding(esc, k8sGrant)
 	if err != nil {
 		return kudov1alpha1.EscalationGrantRef{}, err
 	}
 
 	if roleBinding != nil {
+		asValue, err := v1alpha1.EncodeValueWithKind(
+			grant.Kind,
+			kudov1alpha1.K8sRoleBindingGrantRef{
+				Name:            roleBinding.Name,
+				Namespace:       roleBinding.Namespace,
+				UID:             roleBinding.UID,
+				ResourceVersion: roleBinding.ResourceVersion,
+			},
+		)
+
 		return kudov1alpha1.EscalationGrantRef{
-			Kind:            grant.Kind,
-			Name:            roleBinding.Name,
-			Namespace:       roleBinding.Namespace,
-			Status:          kudov1alpha1.GrantStatusCreated,
-			UID:             roleBinding.UID,
-			ResourceVersion: roleBinding.ResourceVersion,
-		}, nil
+			Ref:    asValue,
+			Status: kudov1alpha1.GrantStatusCreated,
+		}, err
 	}
 
-	ns, err := targetNamespace(esc, grant)
+	ns, err := targetNamespace(esc, k8sGrant)
 	if err != nil {
 		return kudov1alpha1.EscalationGrantRef{}, err
 	}
@@ -89,8 +101,8 @@ func (g *k8sRoleBindingGranter) Create(ctx context.Context, esc *kudov1alpha1.Es
 			},
 			RoleRef: rbacv1.RoleRef{
 				APIGroup: rbacv1.SchemeGroupVersion.Group,
-				Kind:     grant.RoleRef.Kind,
-				Name:     grant.RoleRef.Name,
+				Kind:     k8sGrant.RoleRef.Kind,
+				Name:     k8sGrant.RoleRef.Name,
 			},
 		},
 		metav1.CreateOptions{},
@@ -107,45 +119,54 @@ func (g *k8sRoleBindingGranter) Create(ctx context.Context, esc *kudov1alpha1.Es
 		"namespace",
 		ns,
 		"roleRef",
-		grant.RoleRef.Name,
+		k8sGrant.RoleRef.Name,
 		"roleBindingName",
 		roleBinding.Name,
 	)
 
+	encodedRef, err := v1alpha1.EncodeValueWithKind(
+		K8sRoleBindingKind,
+		kudov1alpha1.K8sRoleBindingGrantRef{
+			Name:            roleBinding.Name,
+			Namespace:       roleBinding.Namespace,
+			UID:             roleBinding.UID,
+			ResourceVersion: roleBinding.ResourceVersion,
+		},
+	)
+
+	if err != nil {
+		return kudov1alpha1.EscalationGrantRef{}, err
+	}
+
 	return kudov1alpha1.EscalationGrantRef{
-		Kind:            grant.Kind,
-		Name:            roleBinding.Name,
-		Namespace:       roleBinding.Namespace,
-		Status:          kudov1alpha1.GrantStatusCreated,
-		UID:             roleBinding.UID,
-		ResourceVersion: roleBinding.ResourceVersion,
+		Status: kudov1alpha1.GrantStatusCreated,
+		Ref:    encodedRef,
 	}, nil
 }
 
 func (g *k8sRoleBindingGranter) Reclaim(ctx context.Context, ref kudov1alpha1.EscalationGrantRef) (kudov1alpha1.EscalationGrantRef, error) {
-	status := kudov1alpha1.EscalationGrantRef{
-		Kind:            ref.Kind,
-		Name:            ref.Name,
-		Namespace:       ref.Namespace,
-		Status:          kudov1alpha1.GrantStatusReclaimed,
-		UID:             ref.UID,
-		ResourceVersion: ref.ResourceVersion,
+	k8sRef, err := kudov1alpha1.DecodeValueWithKind[v1alpha1.K8sRoleBindingGrantRef](ref.Ref)
+	if err != nil {
+		return kudov1alpha1.EscalationGrantRef{}, err
 	}
 
-	_, err := g.roleBindingLister.RoleBindings(ref.Namespace).Get(ref.Name)
+	status := kudov1alpha1.EscalationGrantRef{
+		Status: kudov1alpha1.GrantStatusReclaimed,
+		Ref:    ref.Ref,
+	}
+
+	_, err = g.roleBindingLister.RoleBindings(k8sRef.Namespace).Get(k8sRef.Name)
 	switch {
 	case errors.IsNotFound(err):
 		return status, nil
-
 	case err != nil:
 		return kudov1alpha1.EscalationGrantRef{}, err
 	}
 
-	err = g.rbacClient.RoleBindings(ref.Namespace).Delete(ctx, ref.Name, metav1.DeleteOptions{})
+	err = g.rbacClient.RoleBindings(k8sRef.Namespace).Delete(ctx, k8sRef.Name, metav1.DeleteOptions{})
 	switch {
 	case errors.IsNotFound(err):
 		return status, nil
-
 	case err != nil:
 		return kudov1alpha1.EscalationGrantRef{}, err
 	}
@@ -153,24 +174,34 @@ func (g *k8sRoleBindingGranter) Reclaim(ctx context.Context, ref kudov1alpha1.Es
 	klog.InfoS(
 		"Deleted a role binding",
 		"namespace",
-		ref.Namespace,
+		k8sRef.Namespace,
 		"roleBndingName",
-		ref.Name,
+		k8sRef.Name,
 	)
 
 	return status, nil
 }
 
 // Validate makes sure that the target namespace is properly defined.
-func (g *k8sRoleBindingGranter) Validate(_ context.Context, esc *kudov1alpha1.Escalation, grant kudov1alpha1.EscalationGrant) error {
-	_, err := targetNamespace(esc, grant)
+func (g *k8sRoleBindingGranter) Validate(_ context.Context, esc *kudov1alpha1.Escalation, grant kudov1alpha1.ValueWithKind) error {
+	k8sGrant, err := kudov1alpha1.DecodeValueWithKind[v1alpha1.K8sRoleBindingGrant](grant)
+	if err != nil {
+		return err
+	}
+
+	_, err = targetNamespace(esc, k8sGrant)
 	return err
 }
 
-func (g *k8sRoleBindingGranter) findRoleBinding(esc *kudov1alpha1.Escalation, grant kudov1alpha1.EscalationGrant) (*rbacv1.RoleBinding, error) {
+func (g *k8sRoleBindingGranter) findRoleBinding(esc *kudov1alpha1.Escalation, grant *kudov1alpha1.K8sRoleBindingGrant) (*rbacv1.RoleBinding, error) {
 	for _, grantRef := range esc.Status.GrantRefs {
-		if grantRef.Kind != K8sRoleBindingKind || grantRef.Status != kudov1alpha1.GrantStatusCreated {
+		if grantRef.Ref.Kind != K8sRoleBindingKind || grantRef.Status != kudov1alpha1.GrantStatusCreated {
 			continue
+		}
+
+		k8sRef, err := v1alpha1.DecodeValueWithKind[kudov1alpha1.K8sRoleBindingGrantRef](grantRef.Ref)
+		if err != nil {
+			return nil, err
 		}
 
 		ns, err := targetNamespace(esc, grant)
@@ -178,7 +209,7 @@ func (g *k8sRoleBindingGranter) findRoleBinding(esc *kudov1alpha1.Escalation, gr
 			return nil, err
 		}
 
-		binding, err := g.roleBindingLister.RoleBindings(ns).Get(grantRef.Name)
+		binding, err := g.roleBindingLister.RoleBindings(ns).Get(k8sRef.Name)
 		switch {
 		case errors.IsNotFound(err):
 			continue
@@ -187,7 +218,7 @@ func (g *k8sRoleBindingGranter) findRoleBinding(esc *kudov1alpha1.Escalation, gr
 		}
 
 		// Lookup for a binding, check it's UID and ResourceVersion if it has been tampered, fail the escalation.
-		if binding.UID != grantRef.UID || binding.ResourceVersion != grantRef.ResourceVersion {
+		if binding.UID != k8sRef.UID || binding.ResourceVersion != k8sRef.ResourceVersion {
 			return nil, fmt.Errorf(
 				"%w: Role binding %s in namespace %s",
 				ErrTampered,
@@ -206,7 +237,7 @@ func (g *k8sRoleBindingGranter) findRoleBinding(esc *kudov1alpha1.Escalation, gr
 	return nil, nil
 }
 
-func targetNamespace(esc *kudov1alpha1.Escalation, grant kudov1alpha1.EscalationGrant) (string, error) {
+func targetNamespace(esc *kudov1alpha1.Escalation, grant *kudov1alpha1.K8sRoleBindingGrant) (string, error) {
 	// If we don't have a namespace specified, then see if the grant specifies a default namespace.
 	// It yes, use it, if not fail with panache.
 	if esc.Spec.Namespace == "" {
