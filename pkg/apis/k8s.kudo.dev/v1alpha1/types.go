@@ -18,6 +18,10 @@ const (
 	KindEscalationPolicy = "EscalationPolicy"
 )
 
+const (
+	GrantKindK8sRoleBinding = "KubernetesRoleBinding"
+)
+
 // +genclient
 // +genclient:noStatus
 // +genclient:nonNamespaced

@@ -9,7 +9,6 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/jlevesy/kudo/grant"
 	kudov1alpha1 "github.com/jlevesy/kudo/pkg/apis/k8s.kudo.dev/v1alpha1"
 )
 
@@ -40,7 +39,7 @@ func TestEscalation_RoleBinding(t *testing.T) {
 			t,
 			withGrants(
 				kudov1alpha1.MustEncodeValueWithKind(
-					grant.K8sRoleBindingKind,
+					kudov1alpha1.GrantKindK8sRoleBinding,
 					kudov1alpha1.K8sRoleBindingGrant{
 						DefaultNamespace: namespaces[0].Name,
 						RoleRef: rbacv1.RoleRef{
@@ -50,7 +49,7 @@ func TestEscalation_RoleBinding(t *testing.T) {
 					},
 				),
 				kudov1alpha1.MustEncodeValueWithKind(
-					grant.K8sRoleBindingKind,
+					kudov1alpha1.GrantKindK8sRoleBinding,
 					kudov1alpha1.K8sRoleBindingGrant{
 						DefaultNamespace: namespaces[1].Name,
 						RoleRef: rbacv1.RoleRef{
@@ -172,7 +171,7 @@ func TestEscalation_RoleBinding_UserAskedNamespace(t *testing.T) {
 			t,
 			withGrants(
 				kudov1alpha1.MustEncodeValueWithKind(
-					grant.K8sRoleBindingKind,
+					kudov1alpha1.GrantKindK8sRoleBinding,
 					kudov1alpha1.K8sRoleBindingGrant{
 						AllowedNamespaces: []string{
 							namespace.Name,
@@ -287,7 +286,7 @@ func TestEscalation_RoleBinding_DeniedIfTamperedWith(t *testing.T) {
 			withDefaultDuration(60*time.Minute), // Should not expire.
 			withGrants(
 				kudov1alpha1.MustEncodeValueWithKind(
-					grant.K8sRoleBindingKind,
+					kudov1alpha1.GrantKindK8sRoleBinding,
 					kudov1alpha1.K8sRoleBindingGrant{
 						DefaultNamespace: namespace.Name,
 						RoleRef: rbacv1.RoleRef{

@@ -11,7 +11,6 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/jlevesy/kudo/grant"
 	kudov1alpha1 "github.com/jlevesy/kudo/pkg/apis/k8s.kudo.dev/v1alpha1"
 )
 
@@ -35,7 +34,7 @@ func TestEscalation_Controller_UsesEscalationDuration(t *testing.T) {
 			withMaxDuration(100*time.Second),
 			withGrants(
 				kudov1alpha1.MustEncodeValueWithKind(
-					grant.K8sRoleBindingKind,
+					kudov1alpha1.GrantKindK8sRoleBinding,
 					kudov1alpha1.K8sRoleBindingGrant{
 						AllowedNamespaces: []string{namespace.Name},
 						RoleRef: rbacv1.RoleRef{
@@ -151,7 +150,7 @@ func TestEscalation_Controller_RecordsEscalationEvent(t *testing.T) {
 			withDefaultDuration(5*time.Second),
 			withGrants(
 				kudov1alpha1.MustEncodeValueWithKind(
-					grant.K8sRoleBindingKind,
+					kudov1alpha1.GrantKindK8sRoleBinding,
 					kudov1alpha1.K8sRoleBindingGrant{
 						AllowedNamespaces: []string{namespace.Name},
 						RoleRef: rbacv1.RoleRef{
@@ -288,7 +287,7 @@ func TestEscalation_Controller_DenyEscalationIfPolicyChanges(t *testing.T) {
 			withDefaultDuration(60*time.Minute), // Should not expire.
 			withGrants(
 				kudov1alpha1.MustEncodeValueWithKind(
-					grant.K8sRoleBindingKind,
+					kudov1alpha1.GrantKindK8sRoleBinding,
 					kudov1alpha1.K8sRoleBindingGrant{
 						AllowedNamespaces: []string{namespace.Name},
 						RoleRef: rbacv1.RoleRef{
@@ -349,7 +348,7 @@ func TestEscalation_Controller_DenyEscalationIfPolicyChanges(t *testing.T) {
 	gotPolicy.Spec.Target.Grants = append(
 		policy.Spec.Target.Grants,
 		kudov1alpha1.MustEncodeValueWithKind(
-			grant.K8sRoleBindingKind,
+			kudov1alpha1.GrantKindK8sRoleBinding,
 			kudov1alpha1.K8sRoleBindingGrant{
 				DefaultNamespace: "foo",
 				RoleRef: rbacv1.RoleRef{
@@ -404,7 +403,7 @@ func TestEscalation_Controller_DropsPermissionsIfEscalationDeleted(t *testing.T)
 			withDefaultDuration(60*time.Minute), // Should not expire.
 			withGrants(
 				kudov1alpha1.MustEncodeValueWithKind(
-					grant.K8sRoleBindingKind,
+					kudov1alpha1.GrantKindK8sRoleBinding,
 					kudov1alpha1.K8sRoleBindingGrant{
 						AllowedNamespaces: []string{namespace.Name},
 						RoleRef: rbacv1.RoleRef{

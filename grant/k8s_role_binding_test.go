@@ -76,7 +76,7 @@ var (
 				{
 					Status: kudov1alpha1.GrantStatusCreated,
 					Ref: kudov1alpha1.MustEncodeValueWithKind(
-						grant.K8sRoleBindingKind,
+						kudov1alpha1.GrantKindK8sRoleBinding,
 						kudov1alpha1.K8sRoleBindingGrantRef{
 							Name:            "",
 							Namespace:       "ns-a",
@@ -103,7 +103,7 @@ var (
 				kudov1alpha1.EscalationGrantRef{
 					Status: kudov1alpha1.GrantStatusCreated,
 					Ref: kudov1alpha1.MustEncodeValueWithKind(
-						grant.K8sRoleBindingKind,
+						kudov1alpha1.GrantKindK8sRoleBinding,
 						kudov1alpha1.K8sRoleBindingGrantRef{
 							Name:      "",
 							Namespace: "ns-a",
@@ -118,7 +118,7 @@ var (
 	}
 
 	testGrant = kudov1alpha1.MustEncodeValueWithKind(
-		grant.K8sRoleBindingKind,
+		kudov1alpha1.GrantKindK8sRoleBinding,
 		kudov1alpha1.K8sRoleBindingGrant{
 			AllowedNamespaces: []string{
 				"ns-a",
@@ -134,7 +134,7 @@ var (
 	)
 
 	testGrantNoNs = kudov1alpha1.MustEncodeValueWithKind(
-		grant.K8sRoleBindingKind,
+		kudov1alpha1.GrantKindK8sRoleBinding,
 		kudov1alpha1.K8sRoleBindingGrant{
 			AllowedNamespaces: []string{
 				"ns-a",
@@ -360,7 +360,7 @@ func TestK8sRoleBindingGranter_Create(t *testing.T) {
 			k8sGrant, err := kudov1alpha1.DecodeValueWithKind[kudov1alpha1.K8sRoleBindingGrant](testCase.grant)
 			require.NoError(t, err)
 
-			granter, err := factory.Get(grant.K8sRoleBindingKind)
+			granter, err := factory.Get(kudov1alpha1.GrantKindK8sRoleBinding)
 			require.NoError(t, err)
 
 			gotRef, err := granter.Create(ctx, &testCase.escalation, testCase.grant)
@@ -411,7 +411,7 @@ func TestK8sRoleBindingGranter_Reclaim(t *testing.T) {
 			seed: []runtime.Object{&existingBinding, &otherBinding},
 			grantRef: kudov1alpha1.EscalationGrantRef{
 				Ref: kudov1alpha1.MustEncodeValueWithKind(
-					grant.K8sRoleBindingKind,
+					kudov1alpha1.GrantKindK8sRoleBinding,
 					kudov1alpha1.K8sRoleBindingGrantRef{
 						Name:      "",
 						Namespace: "ns-a",
@@ -432,7 +432,7 @@ func TestK8sRoleBindingGranter_Reclaim(t *testing.T) {
 			seed: []runtime.Object{&otherBinding},
 			grantRef: kudov1alpha1.EscalationGrantRef{
 				Ref: kudov1alpha1.MustEncodeValueWithKind(
-					grant.K8sRoleBindingKind,
+					kudov1alpha1.GrantKindK8sRoleBinding,
 					kudov1alpha1.K8sRoleBindingGrantRef{
 						Name:      "",
 						Namespace: "ns-a",
@@ -462,7 +462,7 @@ func TestK8sRoleBindingGranter_Reclaim(t *testing.T) {
 			k8sRef, err := kudov1alpha1.DecodeValueWithKind[kudov1alpha1.K8sRoleBindingGrantRef](testCase.grantRef.Ref)
 			require.NoError(t, err)
 
-			granter, err := factory.Get(grant.K8sRoleBindingKind)
+			granter, err := factory.Get(kudov1alpha1.GrantKindK8sRoleBinding)
 			require.NoError(t, err)
 
 			gotRef, err := granter.Reclaim(ctx, testCase.grantRef)
@@ -495,7 +495,7 @@ func TestK8sRoleBindingGranter_Validate(t *testing.T) {
 		{
 			desc: "raises an error if no namespace could be picked",
 			grant: kudov1alpha1.MustEncodeValueWithKind(
-				grant.K8sRoleBindingKind,
+				kudov1alpha1.GrantKindK8sRoleBinding,
 				struct{}{},
 			),
 			escalation: kudov1alpha1.Escalation{},
@@ -504,7 +504,7 @@ func TestK8sRoleBindingGranter_Validate(t *testing.T) {
 		{
 			desc: "raises an error if requestor namespace is not in grant allow list",
 			grant: kudov1alpha1.MustEncodeValueWithKind(
-				grant.K8sRoleBindingKind,
+				kudov1alpha1.GrantKindK8sRoleBinding,
 				kudov1alpha1.K8sRoleBindingGrant{
 					AllowedNamespaces: []string{
 						"ns-a",
@@ -521,7 +521,7 @@ func TestK8sRoleBindingGranter_Validate(t *testing.T) {
 		{
 			desc: "raises no error if default namespace is picked",
 			grant: kudov1alpha1.MustEncodeValueWithKind(
-				grant.K8sRoleBindingKind,
+				kudov1alpha1.GrantKindK8sRoleBinding,
 				kudov1alpha1.K8sRoleBindingGrant{
 					DefaultNamespace: "ns-c",
 					AllowedNamespaces: []string{
@@ -538,7 +538,7 @@ func TestK8sRoleBindingGranter_Validate(t *testing.T) {
 		{
 			desc: "raises no error if requestor namespace is allowed",
 			grant: kudov1alpha1.MustEncodeValueWithKind(
-				grant.K8sRoleBindingKind,
+				kudov1alpha1.GrantKindK8sRoleBinding,
 				kudov1alpha1.K8sRoleBindingGrant{
 					AllowedNamespaces: []string{
 						"ns-a",
@@ -562,7 +562,7 @@ func TestK8sRoleBindingGranter_Validate(t *testing.T) {
 
 			defer cancel()
 
-			granter, err := factory.Get(grant.K8sRoleBindingKind)
+			granter, err := factory.Get(kudov1alpha1.GrantKindK8sRoleBinding)
 			require.NoError(t, err)
 
 			err = granter.Validate(ctx, &testCase.escalation, testCase.grant)

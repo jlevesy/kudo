@@ -18,10 +18,6 @@ import (
 )
 
 const (
-	K8sRoleBindingKind = "KubernetesRoleBinding"
-)
-
-const (
 	managedByLabel        = "app.kubernetes.io/created-by"
 	defaultManagedByValue = "kudo"
 )
@@ -125,7 +121,7 @@ func (g *k8sRoleBindingGranter) Create(ctx context.Context, esc *kudov1alpha1.Es
 	)
 
 	encodedRef, err := v1alpha1.EncodeValueWithKind(
-		K8sRoleBindingKind,
+		kudov1alpha1.GrantKindK8sRoleBinding,
 		kudov1alpha1.K8sRoleBindingGrantRef{
 			Name:            roleBinding.Name,
 			Namespace:       roleBinding.Namespace,
@@ -195,7 +191,7 @@ func (g *k8sRoleBindingGranter) Validate(_ context.Context, esc *kudov1alpha1.Es
 
 func (g *k8sRoleBindingGranter) findRoleBinding(esc *kudov1alpha1.Escalation, grant *kudov1alpha1.K8sRoleBindingGrant) (*rbacv1.RoleBinding, error) {
 	for _, grantRef := range esc.Status.GrantRefs {
-		if grantRef.Ref.Kind != K8sRoleBindingKind || grantRef.Status != kudov1alpha1.GrantStatusCreated {
+		if grantRef.Ref.Kind != kudov1alpha1.GrantKindK8sRoleBinding || grantRef.Status != kudov1alpha1.GrantStatusCreated {
 			continue
 		}
 
