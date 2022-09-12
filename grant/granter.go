@@ -14,12 +14,12 @@ var (
 // Granter allows to create or reclaim a grant.
 type Granter interface {
 	// Create provision a new grant. It is expected to be idempotent for an escalation and a grant.
-	Create(context.Context, *kudov1alpha1.Escalation, kudov1alpha1.ValueWithKind) (kudov1alpha1.EscalationGrantRef, error)
+	Create(ctx context.Context, escalation *kudov1alpha1.Escalation, grant kudov1alpha1.ValueWithKind) (kudov1alpha1.EscalationGrantRef, error)
 
 	// Reclaim reclaims a given grant.
-	Reclaim(context.Context, kudov1alpha1.EscalationGrantRef) (kudov1alpha1.EscalationGrantRef, error)
+	Reclaim(ctx context.Context, grantRef kudov1alpha1.EscalationGrantRef) (kudov1alpha1.EscalationGrantRef, error)
 
 	// Validate returns an error if the given escalation is not compatible with the given grant.
 	// It is used in webhook early catch configuration issues.
-	Validate(context.Context, *kudov1alpha1.Escalation, kudov1alpha1.ValueWithKind) error
+	Validate(ctx context.Context, escalation *kudov1alpha1.Escalation, grant kudov1alpha1.ValueWithKind) error
 }
