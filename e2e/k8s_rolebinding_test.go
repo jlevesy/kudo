@@ -39,22 +39,26 @@ func TestEscalation_RoleBinding(t *testing.T) {
 		policy = generateEscalationPolicy(
 			t,
 			withGrants(
-				kudov1alpha1.EscalationGrant{
-					Kind:             grant.K8sRoleBindingKind,
-					DefaultNamespace: namespaces[0].Name,
-					RoleRef: rbacv1.RoleRef{
-						Kind: "Role",
-						Name: roles[0].Name,
+				kudov1alpha1.MustEncodeValueWithKind(
+					grant.K8sRoleBindingKind,
+					kudov1alpha1.K8sRoleBindingGrant{
+						DefaultNamespace: namespaces[0].Name,
+						RoleRef: rbacv1.RoleRef{
+							Kind: "Role",
+							Name: roles[0].Name,
+						},
 					},
-				},
-				kudov1alpha1.EscalationGrant{
-					Kind:             grant.K8sRoleBindingKind,
-					DefaultNamespace: namespaces[1].Name,
-					RoleRef: rbacv1.RoleRef{
-						Kind: "Role",
-						Name: roles[1].Name,
+				),
+				kudov1alpha1.MustEncodeValueWithKind(
+					grant.K8sRoleBindingKind,
+					kudov1alpha1.K8sRoleBindingGrant{
+						DefaultNamespace: namespaces[1].Name,
+						RoleRef: rbacv1.RoleRef{
+							Kind: "Role",
+							Name: roles[1].Name,
+						},
 					},
-				},
+				),
 			),
 		)
 
@@ -167,16 +171,18 @@ func TestEscalation_RoleBinding_UserAskedNamespace(t *testing.T) {
 		policy = generateEscalationPolicy(
 			t,
 			withGrants(
-				kudov1alpha1.EscalationGrant{
-					Kind: grant.K8sRoleBindingKind,
-					AllowedNamespaces: []string{
-						namespace.Name,
+				kudov1alpha1.MustEncodeValueWithKind(
+					grant.K8sRoleBindingKind,
+					kudov1alpha1.K8sRoleBindingGrant{
+						AllowedNamespaces: []string{
+							namespace.Name,
+						},
+						RoleRef: rbacv1.RoleRef{
+							Kind: "Role",
+							Name: role.Name,
+						},
 					},
-					RoleRef: rbacv1.RoleRef{
-						Kind: "Role",
-						Name: role.Name,
-					},
-				},
+				),
 			),
 		)
 
@@ -280,14 +286,16 @@ func TestEscalation_RoleBinding_DeniedIfTamperedWith(t *testing.T) {
 			t,
 			withDefaultDuration(60*time.Minute), // Should not expire.
 			withGrants(
-				kudov1alpha1.EscalationGrant{
-					Kind:             grant.K8sRoleBindingKind,
-					DefaultNamespace: namespace.Name,
-					RoleRef: rbacv1.RoleRef{
-						Kind: "Role",
-						Name: role.Name,
+				kudov1alpha1.MustEncodeValueWithKind(
+					grant.K8sRoleBindingKind,
+					kudov1alpha1.K8sRoleBindingGrant{
+						DefaultNamespace: namespace.Name,
+						RoleRef: rbacv1.RoleRef{
+							Kind: "Role",
+							Name: role.Name,
+						},
 					},
-				},
+				),
 			),
 		)
 
@@ -308,7 +316,7 @@ func TestEscalation_RoleBinding_DeniedIfTamperedWith(t *testing.T) {
 
 	_, err = admin.kudo.K8sV1alpha1().EscalationPolicies().Create(ctx, &policy, metav1.CreateOptions{})
 	require.NoError(t, err)
-	
+
 	assertPolicyCreated(t, policy.Name)
 
 	_, err = userA.kudo.K8sV1alpha1().Escalations().Create(ctx, &escalation, metav1.CreateOptions{})
@@ -340,9 +348,11 @@ func TestEscalation_RoleBinding_DeniedIfTamperedWith(t *testing.T) {
 	assertGrantedK8sResourcesCreated(t, *gotEsc, "rolebindings")
 
 	ref := gotEsc.Status.GrantRefs[0]
+	k8sRef, err := kudov1alpha1.DecodeValueWithKind[kudov1alpha1.K8sRoleBindingGrantRef](ref.Ref)
+	require.NoError(t, err)
 
 	// Fetch and patch the role binding to change the subject list.
-	roleBinding, err := admin.k8s.RbacV1().RoleBindings(ref.Namespace).Get(ctx, ref.Name, metav1.GetOptions{})
+	roleBinding, err := admin.k8s.RbacV1().RoleBindings(k8sRef.Namespace).Get(ctx, k8sRef.Name, metav1.GetOptions{})
 	require.NoError(t, err)
 
 	// Do something evil and try to reorient the granted permissions to all authenticated users.
@@ -353,7 +363,7 @@ func TestEscalation_RoleBinding_DeniedIfTamperedWith(t *testing.T) {
 		},
 	}
 
-	_, err = admin.k8s.RbacV1().RoleBindings(ref.Namespace).Update(ctx, roleBinding, metav1.UpdateOptions{})
+	_, err = admin.k8s.RbacV1().RoleBindings(k8sRef.Namespace).Update(ctx, roleBinding, metav1.UpdateOptions{})
 	require.NoError(t, err)
 
 	// Kudo should respond and deny the escalation.

@@ -6,7 +6,9 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 
+	"github.com/jlevesy/kudo/pkg/apis/k8s.kudo.dev/v1alpha1"
 	kudov1alpha1 "github.com/jlevesy/kudo/pkg/apis/k8s.kudo.dev/v1alpha1"
+	"github.com/stretchr/testify/require"
 )
 
 type escalationWaitCondSpec struct {
@@ -45,13 +47,16 @@ func escalationStatusMatchesSpec(want escalationWaitCondSpec, got kudov1alpha1.E
 
 func assertGrantedK8sResourcesCreated(t *testing.T, esc kudov1alpha1.Escalation, resource string) {
 	for _, ref := range esc.Status.GrantRefs {
+		k8sRef, err := v1alpha1.DecodeValueWithKind[kudov1alpha1.K8sRoleBindingGrantRef](ref.Ref)
+		require.NoError(t, err)
+
 		assertObjectCreated(
 			t,
 			admin.k8s.RbacV1().RESTClient(),
 			resourceNameNamespace{
 				resource:  resource,
-				name:      ref.Name,
-				namespace: ref.Namespace,
+				name:      k8sRef.Name,
+				namespace: k8sRef.Namespace,
 			},
 			30*time.Second,
 		)
@@ -60,13 +65,16 @@ func assertGrantedK8sResourcesCreated(t *testing.T, esc kudov1alpha1.Escalation,
 
 func assertGrantedK8sResourcesDeleted(t *testing.T, esc kudov1alpha1.Escalation, resource string) {
 	for _, ref := range esc.Status.GrantRefs {
+		k8sRef, err := v1alpha1.DecodeValueWithKind[kudov1alpha1.K8sRoleBindingGrantRef](ref.Ref)
+		require.NoError(t, err)
+
 		assertObjectDeleted(
 			t,
 			admin.k8s.RbacV1().RESTClient(),
 			resourceNameNamespace{
 				resource:  resource,
-				name:      ref.Name,
-				namespace: ref.Namespace,
+				name:      k8sRef.Name,
+				namespace: k8sRef.Namespace,
 			},
 			30*time.Second,
 		)
