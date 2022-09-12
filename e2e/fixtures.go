@@ -49,7 +49,7 @@ func generateRole(t *testing.T, i int, namespace string, rules ...rbacv1.PolicyR
 
 type escalationPolicyOption func(*kudov1alpha1.EscalationPolicy)
 
-func withGrants(grants ...kudov1alpha1.EscalationGrant) escalationPolicyOption {
+func withGrants(grants ...kudov1alpha1.ValueWithKind) escalationPolicyOption {
 	return func(p *kudov1alpha1.EscalationPolicy) {
 		p.Spec.Target.Grants = grants
 	}

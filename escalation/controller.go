@@ -334,7 +334,7 @@ func (h *Controller) reclaimGrants(ctx context.Context, esc *kudov1alpha1.Escala
 		grantRef := grantRef
 
 		group.Go(func() error {
-			granter, err := h.granterFactory.Get(grantRef.Kind)
+			granter, err := h.granterFactory.Get(grantRef.Ref.Kind)
 			if err != nil {
 				return err
 			}

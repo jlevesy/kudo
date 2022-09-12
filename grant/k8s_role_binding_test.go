@@ -74,12 +74,16 @@ var (
 			State: kudov1alpha1.StateAccepted,
 			GrantRefs: []kudov1alpha1.EscalationGrantRef{
 				{
-					Kind:            grant.K8sRoleBindingKind,
-					Name:            "",
-					Namespace:       "ns-a",
-					Status:          kudov1alpha1.GrantStatusCreated,
-					UID:             types.UID("aaaaa"),
-					ResourceVersion: "340",
+					Status: kudov1alpha1.GrantStatusCreated,
+					Ref: kudov1alpha1.MustEncodeValueWithKind(
+						kudov1alpha1.GrantKindK8sRoleBinding,
+						kudov1alpha1.K8sRoleBindingGrantRef{
+							Name:            "",
+							Namespace:       "ns-a",
+							UID:             types.UID("aaaaa"),
+							ResourceVersion: "340",
+						},
+					),
 				},
 			},
 		},
@@ -96,46 +100,54 @@ var (
 		Status: kudov1alpha1.EscalationStatus{
 			State: kudov1alpha1.StateAccepted,
 			GrantRefs: []kudov1alpha1.EscalationGrantRef{
-				{
-					Kind:      grant.K8sRoleBindingKind,
-					Name:      "",
-					Namespace: "ns-a",
-					Status:    kudov1alpha1.GrantStatusCreated,
-					UID:       types.UID("aaaaa"),
-					// A change has been made. resource is version 340
-					ResourceVersion: "339",
+				kudov1alpha1.EscalationGrantRef{
+					Status: kudov1alpha1.GrantStatusCreated,
+					Ref: kudov1alpha1.MustEncodeValueWithKind(
+						kudov1alpha1.GrantKindK8sRoleBinding,
+						kudov1alpha1.K8sRoleBindingGrantRef{
+							Name:      "",
+							Namespace: "ns-a",
+							UID:       types.UID("aaaaa"),
+							// A change has been made. resource is version 340
+							ResourceVersion: "339",
+						},
+					),
 				},
 			},
 		},
 	}
 
-	testGrant = kudov1alpha1.EscalationGrant{
-		Kind: grant.K8sRoleBindingKind,
-		AllowedNamespaces: []string{
-			"ns-a",
-			"ns-b",
+	testGrant = kudov1alpha1.MustEncodeValueWithKind(
+		kudov1alpha1.GrantKindK8sRoleBinding,
+		kudov1alpha1.K8sRoleBindingGrant{
+			AllowedNamespaces: []string{
+				"ns-a",
+				"ns-b",
+			},
+			DefaultNamespace: "ns-a",
+			RoleRef: rbacv1.RoleRef{
+				APIGroup: rbacv1.GroupName,
+				Kind:     "ClusterRole",
+				Name:     "test-role",
+			},
 		},
-		DefaultNamespace: "ns-a",
-		RoleRef: rbacv1.RoleRef{
-			APIGroup: rbacv1.GroupName,
-			Kind:     "ClusterRole",
-			Name:     "test-role",
-		},
-	}
+	)
 
-	testGrantNoNs = kudov1alpha1.EscalationGrant{
-		Kind: grant.K8sRoleBindingKind,
-		AllowedNamespaces: []string{
-			"ns-a",
-			"ns-b",
+	testGrantNoNs = kudov1alpha1.MustEncodeValueWithKind(
+		kudov1alpha1.GrantKindK8sRoleBinding,
+		kudov1alpha1.K8sRoleBindingGrant{
+			AllowedNamespaces: []string{
+				"ns-a",
+				"ns-b",
+			},
+			DefaultNamespace: "",
+			RoleRef: rbacv1.RoleRef{
+				APIGroup: rbacv1.GroupName,
+				Kind:     "ClusterRole",
+				Name:     "test-role",
+			},
 		},
-		DefaultNamespace: "",
-		RoleRef: rbacv1.RoleRef{
-			APIGroup: rbacv1.GroupName,
-			Kind:     "ClusterRole",
-			Name:     "test-role",
-		},
-	}
+	)
 
 	otherBinding = rbacv1.RoleBinding{
 		TypeMeta: metav1.TypeMeta{
@@ -259,36 +271,35 @@ func TestK8sRoleBindingGranter_Create(t *testing.T) {
 		seed []runtime.Object
 
 		escalation kudov1alpha1.Escalation
-		grant      kudov1alpha1.EscalationGrant
+		grant      kudov1alpha1.ValueWithKind
 
-		wantRef         kudov1alpha1.EscalationGrantRef
+		wantRefStatus   kudov1alpha1.GrantStatus
+		wantK8sRef      kudov1alpha1.K8sRoleBindingGrantRef
 		wantCreateError error
 		wantBindings    rbacv1.RoleBindingList
 	}{
 		{
-			desc:       "creates a new role binding when none exists",
-			seed:       []runtime.Object{&otherBinding},
-			escalation: testEscalation,
-			grant:      testGrant,
-			wantRef: kudov1alpha1.EscalationGrantRef{
-				Kind:      grant.K8sRoleBindingKind,
+			desc:          "creates a new role binding when none exists",
+			seed:          []runtime.Object{&otherBinding},
+			escalation:    testEscalation,
+			grant:         testGrant,
+			wantRefStatus: kudov1alpha1.GrantStatusCreated,
+			wantK8sRef: kudov1alpha1.K8sRoleBindingGrantRef{
 				Name:      "", // testclient does not handle generate name.
 				Namespace: "ns-a",
-				Status:    kudov1alpha1.GrantStatusCreated,
 			},
 			wantBindings: rbacv1.RoleBindingList{
 				Items: []rbacv1.RoleBinding{existingBindingNoUID, otherBinding},
 			},
 		},
 		{
-			desc:       "creates a new role binding on user requested namespace",
-			escalation: testEscalationWithTargetNs,
-			grant:      testGrant,
-			wantRef: kudov1alpha1.EscalationGrantRef{
-				Kind:      grant.K8sRoleBindingKind,
+			desc:          "creates a new role binding on user requested namespace",
+			escalation:    testEscalationWithTargetNs,
+			grant:         testGrant,
+			wantRefStatus: kudov1alpha1.GrantStatusCreated,
+			wantK8sRef: kudov1alpha1.K8sRoleBindingGrantRef{
 				Name:      "", // testclient does not handle generate name.
 				Namespace: "ns-b",
-				Status:    kudov1alpha1.GrantStatusCreated,
 			},
 			wantBindings: rbacv1.RoleBindingList{
 				Items: []rbacv1.RoleBinding{existingBindingNoUIDNsB},
@@ -298,7 +309,6 @@ func TestK8sRoleBindingGranter_Create(t *testing.T) {
 			desc:            "raises an error if the target namespace is not allowed",
 			escalation:      testEscalationWithBadTargetNs,
 			grant:           testGrant,
-			wantRef:         kudov1alpha1.EscalationGrantRef{},
 			wantCreateError: grant.ErrNamespaceNotAllowed,
 			wantBindings:    rbacv1.RoleBindingList{},
 		},
@@ -306,21 +316,19 @@ func TestK8sRoleBindingGranter_Create(t *testing.T) {
 			desc:            "raises an error if no namespace could be picked",
 			escalation:      testEscalation,
 			grant:           testGrantNoNs,
-			wantRef:         kudov1alpha1.EscalationGrantRef{},
 			wantCreateError: grant.ErrNoNamespace,
 			wantBindings:    rbacv1.RoleBindingList{},
 		},
 
 		{
-			desc:       "resuses existing binding",
-			seed:       []runtime.Object{&existingBinding, &otherBinding},
-			escalation: testEscalationAlreadyExistingBinding,
-			grant:      testGrant,
-			wantRef: kudov1alpha1.EscalationGrantRef{
-				Kind:            grant.K8sRoleBindingKind,
+			desc:          "resuses existing binding",
+			seed:          []runtime.Object{&existingBinding, &otherBinding},
+			escalation:    testEscalationAlreadyExistingBinding,
+			grant:         testGrant,
+			wantRefStatus: kudov1alpha1.GrantStatusCreated,
+			wantK8sRef: kudov1alpha1.K8sRoleBindingGrantRef{
 				Name:            "", // testclient does not handle generate name.
 				Namespace:       "ns-a",
-				Status:          kudov1alpha1.GrantStatusCreated,
 				UID:             types.UID("aaaaa"),
 				ResourceVersion: "340",
 			},
@@ -333,7 +341,6 @@ func TestK8sRoleBindingGranter_Create(t *testing.T) {
 			seed:            []runtime.Object{&existingBinding, &otherBinding},
 			escalation:      testEscalationAlreadyExistingBindingTampered,
 			grant:           testGrant,
-			wantRef:         kudov1alpha1.EscalationGrantRef{},
 			wantCreateError: grant.ErrTampered,
 			wantBindings: rbacv1.RoleBindingList{
 				Items: []rbacv1.RoleBinding{existingBinding, otherBinding},
@@ -350,18 +357,29 @@ func TestK8sRoleBindingGranter_Create(t *testing.T) {
 
 			defer cancel()
 
-			granter, err := factory.Get(grant.K8sRoleBindingKind)
+			k8sGrant, err := kudov1alpha1.DecodeValueWithKind[kudov1alpha1.K8sRoleBindingGrant](testCase.grant)
+			require.NoError(t, err)
+
+			granter, err := factory.Get(kudov1alpha1.GrantKindK8sRoleBinding)
 			require.NoError(t, err)
 
 			gotRef, err := granter.Create(ctx, &testCase.escalation, testCase.grant)
 			require.ErrorIs(t, err, testCase.wantCreateError)
 
-			assert.Equal(t, testCase.wantRef, gotRef)
+			if testCase.wantCreateError != nil {
+				return
+			}
+
+			gotK8sRef, err := kudov1alpha1.DecodeValueWithKind[kudov1alpha1.K8sRoleBindingGrantRef](gotRef.Ref)
+			require.NoError(t, err)
+
+			assert.Equal(t, testCase.wantRefStatus, gotRef.Status)
+			assert.Equal(t, testCase.wantK8sRef, *gotK8sRef)
 
 			// Expect the granter to default to the grant default namespace.
 			targetNs := testCase.escalation.Spec.Namespace
 			if targetNs == "" {
-				targetNs = testCase.grant.DefaultNamespace
+				targetNs = k8sGrant.DefaultNamespace
 			}
 
 			gotBindings, err := k8s.
@@ -384,22 +402,26 @@ func TestK8sRoleBindingGranter_Reclaim(t *testing.T) {
 
 		grantRef kudov1alpha1.EscalationGrantRef
 
-		wantRef      kudov1alpha1.EscalationGrantRef
-		wantBindings rbacv1.RoleBindingList
+		wantRefStatus kudov1alpha1.GrantStatus
+		wantK8sRef    kudov1alpha1.K8sRoleBindingGrantRef
+		wantBindings  rbacv1.RoleBindingList
 	}{
 		{
 			desc: "deletes the role binding if it exists",
 			seed: []runtime.Object{&existingBinding, &otherBinding},
 			grantRef: kudov1alpha1.EscalationGrantRef{
-				Kind:      grant.K8sRoleBindingKind,
-				Name:      "",
-				Namespace: "ns-a",
+				Ref: kudov1alpha1.MustEncodeValueWithKind(
+					kudov1alpha1.GrantKindK8sRoleBinding,
+					kudov1alpha1.K8sRoleBindingGrantRef{
+						Name:      "",
+						Namespace: "ns-a",
+					},
+				),
 			},
-			wantRef: kudov1alpha1.EscalationGrantRef{
-				Kind:      grant.K8sRoleBindingKind,
+			wantRefStatus: kudov1alpha1.GrantStatusReclaimed,
+			wantK8sRef: kudov1alpha1.K8sRoleBindingGrantRef{
 				Name:      "", // testclient does not handle generate name.
 				Namespace: "ns-a",
-				Status:    kudov1alpha1.GrantStatusReclaimed,
 			},
 			wantBindings: rbacv1.RoleBindingList{
 				Items: []rbacv1.RoleBinding{otherBinding},
@@ -409,15 +431,18 @@ func TestK8sRoleBindingGranter_Reclaim(t *testing.T) {
 			desc: "does not delete the role binding if it does not exists",
 			seed: []runtime.Object{&otherBinding},
 			grantRef: kudov1alpha1.EscalationGrantRef{
-				Kind:      grant.K8sRoleBindingKind,
-				Name:      "",
-				Namespace: "ns-a",
+				Ref: kudov1alpha1.MustEncodeValueWithKind(
+					kudov1alpha1.GrantKindK8sRoleBinding,
+					kudov1alpha1.K8sRoleBindingGrantRef{
+						Name:      "",
+						Namespace: "ns-a",
+					},
+				),
 			},
-			wantRef: kudov1alpha1.EscalationGrantRef{
-				Kind:      grant.K8sRoleBindingKind,
+			wantRefStatus: kudov1alpha1.GrantStatusReclaimed,
+			wantK8sRef: kudov1alpha1.K8sRoleBindingGrantRef{
 				Name:      "", // testclient does not handle generate name.
 				Namespace: "ns-a",
-				Status:    kudov1alpha1.GrantStatusReclaimed,
 			},
 			wantBindings: rbacv1.RoleBindingList{
 				Items: []rbacv1.RoleBinding{otherBinding},
@@ -434,18 +459,24 @@ func TestK8sRoleBindingGranter_Reclaim(t *testing.T) {
 
 			defer cancel()
 
-			granter, err := factory.Get(grant.K8sRoleBindingKind)
+			k8sRef, err := kudov1alpha1.DecodeValueWithKind[kudov1alpha1.K8sRoleBindingGrantRef](testCase.grantRef.Ref)
+			require.NoError(t, err)
+
+			granter, err := factory.Get(kudov1alpha1.GrantKindK8sRoleBinding)
 			require.NoError(t, err)
 
 			gotRef, err := granter.Reclaim(ctx, testCase.grantRef)
 			require.NoError(t, err)
 
-			assert.Equal(t, testCase.wantRef, gotRef)
+			gotK8sRef, err := kudov1alpha1.DecodeValueWithKind[kudov1alpha1.K8sRoleBindingGrantRef](gotRef.Ref)
+			require.NoError(t, err)
+
+			assert.Equal(t, testCase.wantK8sRef, *gotK8sRef)
 
 			gotBindings, err := k8s.
 				kubeClientSet.
 				RbacV1().
-				RoleBindings(testCase.grantRef.Namespace).
+				RoleBindings(k8sRef.Namespace).
 				List(ctx, metav1.ListOptions{})
 
 			require.NoError(t, err)
@@ -457,23 +488,29 @@ func TestK8sRoleBindingGranter_Reclaim(t *testing.T) {
 func TestK8sRoleBindingGranter_Validate(t *testing.T) {
 	testCases := []struct {
 		desc       string
-		grant      kudov1alpha1.EscalationGrant
+		grant      kudov1alpha1.ValueWithKind
 		escalation kudov1alpha1.Escalation
 		wantError  error
 	}{
 		{
-			desc:       "raises an error if no namespace could be picked",
-			grant:      kudov1alpha1.EscalationGrant{},
+			desc: "raises an error if no namespace could be picked",
+			grant: kudov1alpha1.MustEncodeValueWithKind(
+				kudov1alpha1.GrantKindK8sRoleBinding,
+				struct{}{},
+			),
 			escalation: kudov1alpha1.Escalation{},
 			wantError:  grant.ErrNoNamespace,
 		},
 		{
 			desc: "raises an error if requestor namespace is not in grant allow list",
-			grant: kudov1alpha1.EscalationGrant{
-				AllowedNamespaces: []string{
-					"ns-a",
+			grant: kudov1alpha1.MustEncodeValueWithKind(
+				kudov1alpha1.GrantKindK8sRoleBinding,
+				kudov1alpha1.K8sRoleBindingGrant{
+					AllowedNamespaces: []string{
+						"ns-a",
+					},
 				},
-			},
+			),
 			escalation: kudov1alpha1.Escalation{
 				Spec: kudov1alpha1.EscalationSpec{
 					Namespace: "ns-b",
@@ -483,12 +520,15 @@ func TestK8sRoleBindingGranter_Validate(t *testing.T) {
 		},
 		{
 			desc: "raises no error if default namespace is picked",
-			grant: kudov1alpha1.EscalationGrant{
-				DefaultNamespace: "ns-c",
-				AllowedNamespaces: []string{
-					"ns-a",
+			grant: kudov1alpha1.MustEncodeValueWithKind(
+				kudov1alpha1.GrantKindK8sRoleBinding,
+				kudov1alpha1.K8sRoleBindingGrant{
+					DefaultNamespace: "ns-c",
+					AllowedNamespaces: []string{
+						"ns-a",
+					},
 				},
-			},
+			),
 			escalation: kudov1alpha1.Escalation{
 				Spec: kudov1alpha1.EscalationSpec{
 					Namespace: "",
@@ -497,11 +537,14 @@ func TestK8sRoleBindingGranter_Validate(t *testing.T) {
 		},
 		{
 			desc: "raises no error if requestor namespace is allowed",
-			grant: kudov1alpha1.EscalationGrant{
-				AllowedNamespaces: []string{
-					"ns-a",
+			grant: kudov1alpha1.MustEncodeValueWithKind(
+				kudov1alpha1.GrantKindK8sRoleBinding,
+				kudov1alpha1.K8sRoleBindingGrant{
+					AllowedNamespaces: []string{
+						"ns-a",
+					},
 				},
-			},
+			),
 			escalation: kudov1alpha1.Escalation{
 				Spec: kudov1alpha1.EscalationSpec{
 					Namespace: "ns-a",
@@ -519,7 +562,7 @@ func TestK8sRoleBindingGranter_Validate(t *testing.T) {
 
 			defer cancel()
 
-			granter, err := factory.Get(grant.K8sRoleBindingKind)
+			granter, err := factory.Get(kudov1alpha1.GrantKindK8sRoleBinding)
 			require.NoError(t, err)
 
 			err = granter.Validate(ctx, &testCase.escalation, testCase.grant)

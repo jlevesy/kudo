@@ -47,25 +47,29 @@ var (
 			Challenges: []kudov1alpha1.EscalationChallenge{},
 			Target: kudov1alpha1.EscalationTarget{
 				DefaultDuration: metav1.Duration{Duration: time.Hour},
-				Grants: []kudov1alpha1.EscalationGrant{
-					{
-						Kind:             testGrantKind,
-						DefaultNamespace: "test-ns-1",
-						RoleRef: rbacv1.RoleRef{
-							APIGroup: rbacv1.GroupName,
-							Kind:     "ClusterRoleBinding",
-							Name:     "woopy-woop",
+				Grants: []kudov1alpha1.ValueWithKind{
+					kudov1alpha1.MustEncodeValueWithKind(
+						testGrantKind,
+						kudov1alpha1.K8sRoleBindingGrant{
+							DefaultNamespace: "test-ns-1",
+							RoleRef: rbacv1.RoleRef{
+								APIGroup: rbacv1.GroupName,
+								Kind:     "ClusterRoleBinding",
+								Name:     "woopy-woop",
+							},
 						},
-					},
-					{
-						Kind:             testGrantKind,
-						DefaultNamespace: "test-ns-2",
-						RoleRef: rbacv1.RoleRef{
-							APIGroup: rbacv1.GroupName,
-							Kind:     "ClusterRoleBinding",
-							Name:     "woopy-wap",
+					),
+					kudov1alpha1.MustEncodeValueWithKind(
+						testGrantKind,
+						kudov1alpha1.K8sRoleBindingGrant{
+							DefaultNamespace: "test-ns-2",
+							RoleRef: rbacv1.RoleRef{
+								APIGroup: rbacv1.GroupName,
+								Kind:     "ClusterRoleBinding",
+								Name:     "woopy-wap",
+							},
 						},
-					},
+					),
 				},
 			},
 		},
@@ -506,14 +510,22 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 				},
 				GrantRefs: []kudov1alpha1.EscalationGrantRef{
 					{
-						Kind:   testGrantKind,
-						Name:   "grant-test-ns-1",
 						Status: kudov1alpha1.GrantStatusCreated,
+						Ref: kudov1alpha1.MustEncodeValueWithKind(
+							testGrantKind,
+							kudov1alpha1.K8sRoleBindingGrantRef{
+								Name: "grant-test-ns-1",
+							},
+						),
 					},
 					{
-						Kind:   testGrantKind,
-						Name:   "grant-test-ns-2",
 						Status: kudov1alpha1.GrantStatusCreated,
+						Ref: kudov1alpha1.MustEncodeValueWithKind(
+							testGrantKind,
+							kudov1alpha1.K8sRoleBindingGrantRef{
+								Name: "grant-test-ns-2",
+							},
+						),
 					},
 				},
 			},
@@ -552,14 +564,22 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 				},
 				GrantRefs: []kudov1alpha1.EscalationGrantRef{
 					{
-						Kind:   testGrantKind,
-						Name:   "grant-test-ns-1",
 						Status: kudov1alpha1.GrantStatusCreated,
+						Ref: kudov1alpha1.MustEncodeValueWithKind(
+							testGrantKind,
+							kudov1alpha1.K8sRoleBindingGrantRef{
+								Name: "grant-test-ns-1",
+							},
+						),
 					},
 					{
-						Kind:   testGrantKind,
-						Name:   "grant-test-ns-2",
 						Status: kudov1alpha1.GrantStatusCreated,
+						Ref: kudov1alpha1.MustEncodeValueWithKind(
+							testGrantKind,
+							kudov1alpha1.K8sRoleBindingGrantRef{
+								Name: "grant-test-ns-2",
+							},
+						),
 					},
 				},
 			},
@@ -599,14 +619,22 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 				},
 				GrantRefs: []kudov1alpha1.EscalationGrantRef{
 					{
-						Kind:   testGrantKind,
-						Name:   "grant-test-ns-1",
 						Status: kudov1alpha1.GrantStatusCreated,
+						Ref: kudov1alpha1.MustEncodeValueWithKind(
+							testGrantKind,
+							kudov1alpha1.K8sRoleBindingGrantRef{
+								Name: "grant-test-ns-1",
+							},
+						),
 					},
 					{
-						Kind:   testGrantKind,
-						Name:   "grant-test-ns-2",
 						Status: kudov1alpha1.GrantStatusCreated,
+						Ref: kudov1alpha1.MustEncodeValueWithKind(
+							testGrantKind,
+							kudov1alpha1.K8sRoleBindingGrantRef{
+								Name: "grant-test-ns-2",
+							},
+						),
 					},
 				},
 			},
@@ -634,9 +662,13 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 					PolicyVersion: testPolicy.ResourceVersion,
 					GrantRefs: []kudov1alpha1.EscalationGrantRef{
 						{
-							Kind:   testGrantKind,
-							Name:   "grant-test-ns-1",
 							Status: kudov1alpha1.GrantStatusCreated,
+							Ref: kudov1alpha1.MustEncodeValueWithKind(
+								testGrantKind,
+								kudov1alpha1.K8sRoleBindingGrantRef{
+									Name: "grant-test-ns-1",
+								},
+							),
 						},
 					},
 				},
@@ -652,9 +684,13 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 				PolicyVersion: testPolicy.ResourceVersion,
 				GrantRefs: []kudov1alpha1.EscalationGrantRef{
 					{
-						Kind:   testGrantKind,
-						Name:   "grant-test-ns-1",
 						Status: kudov1alpha1.GrantStatusCreated,
+						Ref: kudov1alpha1.MustEncodeValueWithKind(
+							testGrantKind,
+							kudov1alpha1.K8sRoleBindingGrantRef{
+								Name: "grant-test-ns-1",
+							},
+						),
 					},
 				},
 			},
@@ -677,14 +713,22 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 					StateDetails: "expiration has expired",
 					GrantRefs: []kudov1alpha1.EscalationGrantRef{
 						{
-							Kind:   testGrantKind,
-							Name:   "grant-test-ns-1",
 							Status: kudov1alpha1.GrantStatusCreated,
+							Ref: kudov1alpha1.MustEncodeValueWithKind(
+								testGrantKind,
+								kudov1alpha1.K8sRoleBindingGrantRef{
+									Name: "grant-test-ns-1",
+								},
+							),
 						},
 						{
-							Kind:   testGrantKind,
-							Name:   "grant-test-ns-2",
 							Status: kudov1alpha1.GrantStatusCreated,
+							Ref: kudov1alpha1.MustEncodeValueWithKind(
+								testGrantKind,
+								kudov1alpha1.K8sRoleBindingGrantRef{
+									Name: "grant-test-ns-2",
+								},
+							),
 						},
 					},
 				},
@@ -694,14 +738,22 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 				StateDetails: "expiration has expired",
 				GrantRefs: []kudov1alpha1.EscalationGrantRef{
 					{
-						Kind:   testGrantKind,
-						Name:   "grant-test-ns-1",
 						Status: kudov1alpha1.GrantStatusReclaimed,
+						Ref: kudov1alpha1.MustEncodeValueWithKind(
+							testGrantKind,
+							kudov1alpha1.K8sRoleBindingGrantRef{
+								Name: "grant-test-ns-1",
+							},
+						),
 					},
 					{
-						Kind:   testGrantKind,
-						Name:   "grant-test-ns-2",
 						Status: kudov1alpha1.GrantStatusReclaimed,
+						Ref: kudov1alpha1.MustEncodeValueWithKind(
+							testGrantKind,
+							kudov1alpha1.K8sRoleBindingGrantRef{
+								Name: "grant-test-ns-2",
+							},
+						),
 					},
 				},
 			},
@@ -724,14 +776,22 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 					State: kudov1alpha1.StateExpired,
 					GrantRefs: []kudov1alpha1.EscalationGrantRef{
 						{
-							Kind:   testGrantKind,
-							Name:   "grant-test-ns-1",
 							Status: kudov1alpha1.GrantStatusCreated,
+							Ref: kudov1alpha1.MustEncodeValueWithKind(
+								testGrantKind,
+								kudov1alpha1.K8sRoleBindingGrantRef{
+									Name: "grant-test-ns-1",
+								},
+							),
 						},
 						{
-							Kind:   testGrantKind,
-							Name:   "grant-test-ns-2",
 							Status: kudov1alpha1.GrantStatusCreated,
+							Ref: kudov1alpha1.MustEncodeValueWithKind(
+								testGrantKind,
+								kudov1alpha1.K8sRoleBindingGrantRef{
+									Name: "grant-test-ns-2",
+								},
+							),
 						},
 					},
 				},
@@ -742,14 +802,22 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 				StateDetails: "This escalation has expired, but grants have been partially reclaimed. Reason is: nonono",
 				GrantRefs: []kudov1alpha1.EscalationGrantRef{
 					{
-						Kind:   testGrantKind,
-						Name:   "grant-test-ns-1",
 						Status: kudov1alpha1.GrantStatusCreated,
+						Ref: kudov1alpha1.MustEncodeValueWithKind(
+							testGrantKind,
+							kudov1alpha1.K8sRoleBindingGrantRef{
+								Name: "grant-test-ns-1",
+							},
+						),
 					},
 					{
-						Kind:   testGrantKind,
-						Name:   "grant-test-ns-2",
 						Status: kudov1alpha1.GrantStatusCreated,
+						Ref: kudov1alpha1.MustEncodeValueWithKind(
+							testGrantKind,
+							kudov1alpha1.K8sRoleBindingGrantRef{
+								Name: "grant-test-ns-2",
+							},
+						),
 					},
 				},
 			},
@@ -772,14 +840,22 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 					StateDetails: "denied for some reason",
 					GrantRefs: []kudov1alpha1.EscalationGrantRef{
 						{
-							Kind:   testGrantKind,
-							Name:   "grant-test-ns-1",
 							Status: kudov1alpha1.GrantStatusCreated,
+							Ref: kudov1alpha1.MustEncodeValueWithKind(
+								testGrantKind,
+								kudov1alpha1.K8sRoleBindingGrantRef{
+									Name: "grant-test-ns-1",
+								},
+							),
 						},
 						{
-							Kind:   testGrantKind,
-							Name:   "grant-test-ns-2",
 							Status: kudov1alpha1.GrantStatusCreated,
+							Ref: kudov1alpha1.MustEncodeValueWithKind(
+								testGrantKind,
+								kudov1alpha1.K8sRoleBindingGrantRef{
+									Name: "grant-test-ns-2",
+								},
+							),
 						},
 					},
 				},
@@ -789,14 +865,22 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 				StateDetails: "denied for some reason",
 				GrantRefs: []kudov1alpha1.EscalationGrantRef{
 					{
-						Kind:   testGrantKind,
-						Name:   "grant-test-ns-1",
 						Status: kudov1alpha1.GrantStatusReclaimed,
+						Ref: kudov1alpha1.MustEncodeValueWithKind(
+							testGrantKind,
+							kudov1alpha1.K8sRoleBindingGrantRef{
+								Name: "grant-test-ns-1",
+							},
+						),
 					},
 					{
-						Kind:   testGrantKind,
-						Name:   "grant-test-ns-2",
 						Status: kudov1alpha1.GrantStatusReclaimed,
+						Ref: kudov1alpha1.MustEncodeValueWithKind(
+							testGrantKind,
+							kudov1alpha1.K8sRoleBindingGrantRef{
+								Name: "grant-test-ns-2",
+							},
+						),
 					},
 				},
 			},
@@ -819,14 +903,22 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 					State: kudov1alpha1.StateDenied,
 					GrantRefs: []kudov1alpha1.EscalationGrantRef{
 						{
-							Kind:   testGrantKind,
-							Name:   "grant-test-ns-1",
 							Status: kudov1alpha1.GrantStatusCreated,
+							Ref: kudov1alpha1.MustEncodeValueWithKind(
+								testGrantKind,
+								kudov1alpha1.K8sRoleBindingGrantRef{
+									Name: "grant-test-ns-1",
+								},
+							),
 						},
 						{
-							Kind:   testGrantKind,
-							Name:   "grant-test-ns-2",
 							Status: kudov1alpha1.GrantStatusCreated,
+							Ref: kudov1alpha1.MustEncodeValueWithKind(
+								testGrantKind,
+								kudov1alpha1.K8sRoleBindingGrantRef{
+									Name: "grant-test-ns-2",
+								},
+							),
 						},
 					},
 				},
@@ -837,14 +929,22 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 				StateDetails: "This escalation is denied, but grants have been partially reclaimed. Reason is: nonono",
 				GrantRefs: []kudov1alpha1.EscalationGrantRef{
 					{
-						Kind:   testGrantKind,
-						Name:   "grant-test-ns-1",
 						Status: kudov1alpha1.GrantStatusCreated,
+						Ref: kudov1alpha1.MustEncodeValueWithKind(
+							testGrantKind,
+							kudov1alpha1.K8sRoleBindingGrantRef{
+								Name: "grant-test-ns-1",
+							},
+						),
 					},
 					{
-						Kind:   testGrantKind,
-						Name:   "grant-test-ns-2",
 						Status: kudov1alpha1.GrantStatusCreated,
+						Ref: kudov1alpha1.MustEncodeValueWithKind(
+							testGrantKind,
+							kudov1alpha1.K8sRoleBindingGrantRef{
+								Name: "grant-test-ns-2",
+							},
+						),
 					},
 				},
 			},
@@ -856,18 +956,32 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 			var (
 				ctx          = context.Background()
 				dummyGranter = mockGranter{
-					CreateFn: func(_ *kudov1alpha1.Escalation, grant kudov1alpha1.EscalationGrant) (kudov1alpha1.EscalationGrantRef, error) {
+					CreateFn: func(_ *kudov1alpha1.Escalation, grant kudov1alpha1.ValueWithKind) (kudov1alpha1.EscalationGrantRef, error) {
+						k8sGrant, err := kudov1alpha1.DecodeValueWithKind[kudov1alpha1.K8sRoleBindingGrant](grant)
+						require.NoError(t, err)
+
 						return kudov1alpha1.EscalationGrantRef{
-							Kind:   testGrantKind,
-							Name:   "grant-" + grant.DefaultNamespace,
 							Status: kudov1alpha1.GrantStatusCreated,
+							Ref: kudov1alpha1.MustEncodeValueWithKind(
+								testGrantKind,
+								kudov1alpha1.K8sRoleBindingGrantRef{
+									Name: "grant-" + k8sGrant.DefaultNamespace,
+								},
+							),
 						}, testCase.upsertGrantErr
 					},
 					ReclaimFn: func(ref kudov1alpha1.EscalationGrantRef) (kudov1alpha1.EscalationGrantRef, error) {
+						k8sGrantRef, err := kudov1alpha1.DecodeValueWithKind[kudov1alpha1.K8sRoleBindingGrantRef](ref.Ref)
+						require.NoError(t, err)
+
 						return kudov1alpha1.EscalationGrantRef{
-							Kind:   ref.Kind,
-							Name:   ref.Name,
 							Status: kudov1alpha1.GrantStatusReclaimed,
+							Ref: kudov1alpha1.MustEncodeValueWithKind(
+								ref.Ref.Kind,
+								kudov1alpha1.K8sRoleBindingGrantRef{
+									Name: k8sGrantRef.Name,
+								},
+							),
 						}, testCase.reclaimGrantErr
 					},
 				}
@@ -903,8 +1017,12 @@ func TestEscalationController_OnUpdate(t *testing.T) {
 			require.NoError(t, err)
 
 			sort.Slice(gotEscalation.Status.GrantRefs, func(i, j int) bool {
-				return gotEscalation.Status.GrantRefs[i].Name <
-					gotEscalation.Status.GrantRefs[j].Name
+				vi, err := kudov1alpha1.DecodeValueWithKind[kudov1alpha1.K8sRoleBindingGrantRef](gotEscalation.Status.GrantRefs[i].Ref)
+				require.NoError(t, err)
+				vj, err := kudov1alpha1.DecodeValueWithKind[kudov1alpha1.K8sRoleBindingGrantRef](gotEscalation.Status.GrantRefs[j].Ref)
+				require.NoError(t, err)
+
+				return vi.Name < vj.Name
 			})
 
 			assert.Equal(t, testCase.wantEscalationStatus, gotEscalation.Status)
@@ -917,12 +1035,12 @@ func injectMockGranter(g *mockGranter) func() (grant.Granter, error) {
 }
 
 type mockGranter struct {
-	CreateFn   func(*kudov1alpha1.Escalation, kudov1alpha1.EscalationGrant) (kudov1alpha1.EscalationGrantRef, error)
+	CreateFn   func(*kudov1alpha1.Escalation, kudov1alpha1.ValueWithKind) (kudov1alpha1.EscalationGrantRef, error)
 	ReclaimFn  func(kudov1alpha1.EscalationGrantRef) (kudov1alpha1.EscalationGrantRef, error)
-	ValidateFn func(*kudov1alpha1.Escalation, kudov1alpha1.EscalationGrant) error
+	ValidateFn func(*kudov1alpha1.Escalation, kudov1alpha1.ValueWithKind) error
 }
 
-func (g *mockGranter) Create(_ context.Context, esc *kudov1alpha1.Escalation, grant kudov1alpha1.EscalationGrant) (kudov1alpha1.EscalationGrantRef, error) {
+func (g *mockGranter) Create(_ context.Context, esc *kudov1alpha1.Escalation, grant kudov1alpha1.ValueWithKind) (kudov1alpha1.EscalationGrantRef, error) {
 	return g.CreateFn(esc, grant)
 }
 
@@ -930,7 +1048,7 @@ func (g *mockGranter) Reclaim(_ context.Context, grantRef kudov1alpha1.Escalatio
 	return g.ReclaimFn(grantRef)
 }
 
-func (g *mockGranter) Validate(_ context.Context, esc *kudov1alpha1.Escalation, grant kudov1alpha1.EscalationGrant) error {
+func (g *mockGranter) Validate(_ context.Context, esc *kudov1alpha1.Escalation, grant kudov1alpha1.ValueWithKind) error {
 	return g.ValidateFn(esc, grant)
 }
 

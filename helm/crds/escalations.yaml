@@ -56,19 +56,21 @@ spec:
                   items:
                     type: object
                     properties:
-                      kind:
-                        type: string
-                      name:
-                        type: string
-                      namespace:
-                        type: string
-                      uid:
-                        type: string
-                      resourceVersion:
-                        type: string
                       status:
                         type: string
-
+                      ref:
+                        type: object
+                        properties:
+                          kind:
+                            type: string
+                          name:
+                            type: string
+                          namespace:
+                            type: string
+                          uid:
+                            type: string
+                          resourceVersion:
+                            type: string
 status:
   acceptedNames:
     kind: ""

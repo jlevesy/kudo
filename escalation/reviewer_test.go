@@ -47,10 +47,8 @@ var (
 				},
 				Target: kudov1alpha1.EscalationTarget{
 					MaxDuration: metav1.Duration{Duration: time.Hour},
-					Grants: []kudov1alpha1.EscalationGrant{
-						{
-							Kind: testGrantKind,
-						},
+					Grants: []kudov1alpha1.ValueWithKind{
+						kudov1alpha1.MustEncodeValueWithKind(testGrantKind, struct{}{}),
 					},
 				},
 			},
@@ -75,10 +73,8 @@ var (
 					},
 				},
 				Target: kudov1alpha1.EscalationTarget{
-					Grants: []kudov1alpha1.EscalationGrant{
-						{
-							Kind: "nonsense",
-						},
+					Grants: []kudov1alpha1.ValueWithKind{
+						kudov1alpha1.MustEncodeValueWithKind("nonsense", struct{}{}),
 					},
 				},
 			},
@@ -351,7 +347,7 @@ func TestEscalationAdmissionReviewer_ReviewAdmission(t *testing.T) {
 				escalationPolicyInformer = informersFactories.K8s().V1alpha1().EscalationPolicies()
 
 				dummyGranter = mockGranter{
-					ValidateFn: func(_ *kudov1alpha1.Escalation, _ kudov1alpha1.EscalationGrant) error {
+					ValidateFn: func(_ *kudov1alpha1.Escalation, _ kudov1alpha1.ValueWithKind) error {
 						return testCase.grantValidateErr
 					},
 				}

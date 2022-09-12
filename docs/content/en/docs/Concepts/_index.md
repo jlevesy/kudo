@@ -68,9 +68,11 @@ It is composed by the following attributes:
     - `ACCEPTED`: the escalation is accepted and the user has now access to extended privileges
     - `EXPIRED`: the escalation has expired
   - `stateDetails`: some aditional information regarding the state
-  - `PolicyUID` and `PolicyResourceVersion`: which policy resource instance is this escalation based on.
-  - `ExpiresAt` when the escalation expires
-- `GrantRefs`: List of references to all the resource being granted by Kudo with their status.
+  - `policyUID` and `PolicyResourceVersion`: which policy resource instance is this escalation based on.
+  - `expiresAt` when the escalation expires
+- `grantRefs`: List of references to all the resource being granted by Kudo with their status.
+  - `status`: status of the referenced resource (CREATED or RECLAIMED)
+  - `ref`: grant specific information (kind, and metadata that allows to keep track of the resource)
 
 ```yaml
 ---
@@ -89,10 +91,11 @@ status:
   policyUID: aaa-bb-cc
   policyVersion: 484
   grantRefs:
-    - kind: KubernetesRoleBinding
-      name: binding-343df
-      namespace: some-app
-      UID: aaaa-bbb-ccc
-      ResourceVersion: 493
-      status: "CREATED"
+    - status: "CREATED"
+      ref:
+        kind: KubernetesRoleBinding
+        name: binding-343df
+        namespace: some-app
+        UID: aaaa-bbb-ccc
+        ResourceVersion: 493
 ```

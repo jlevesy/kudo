@@ -11,7 +11,6 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/jlevesy/kudo/grant"
 	kudov1alpha1 "github.com/jlevesy/kudo/pkg/apis/k8s.kudo.dev/v1alpha1"
 )
 
@@ -34,14 +33,16 @@ func TestEscalation_Controller_UsesEscalationDuration(t *testing.T) {
 			withDefaultDuration(90*time.Second),
 			withMaxDuration(100*time.Second),
 			withGrants(
-				kudov1alpha1.EscalationGrant{
-					Kind:              grant.K8sRoleBindingKind,
-					AllowedNamespaces: []string{namespace.Name},
-					RoleRef: rbacv1.RoleRef{
-						Kind: "Role",
-						Name: role.Name,
+				kudov1alpha1.MustEncodeValueWithKind(
+					kudov1alpha1.GrantKindK8sRoleBinding,
+					kudov1alpha1.K8sRoleBindingGrant{
+						AllowedNamespaces: []string{namespace.Name},
+						RoleRef: rbacv1.RoleRef{
+							Kind: "Role",
+							Name: role.Name,
+						},
 					},
-				},
+				),
 			),
 		)
 
@@ -148,14 +149,16 @@ func TestEscalation_Controller_RecordsEscalationEvent(t *testing.T) {
 			t,
 			withDefaultDuration(5*time.Second),
 			withGrants(
-				kudov1alpha1.EscalationGrant{
-					Kind:              grant.K8sRoleBindingKind,
-					AllowedNamespaces: []string{namespace.Name},
-					RoleRef: rbacv1.RoleRef{
-						Kind: "Role",
-						Name: role.Name,
+				kudov1alpha1.MustEncodeValueWithKind(
+					kudov1alpha1.GrantKindK8sRoleBinding,
+					kudov1alpha1.K8sRoleBindingGrant{
+						AllowedNamespaces: []string{namespace.Name},
+						RoleRef: rbacv1.RoleRef{
+							Kind: "Role",
+							Name: role.Name,
+						},
 					},
-				},
+				),
 			),
 		)
 
@@ -283,14 +286,16 @@ func TestEscalation_Controller_DenyEscalationIfPolicyChanges(t *testing.T) {
 			t,
 			withDefaultDuration(60*time.Minute), // Should not expire.
 			withGrants(
-				kudov1alpha1.EscalationGrant{
-					Kind:              grant.K8sRoleBindingKind,
-					AllowedNamespaces: []string{namespace.Name},
-					RoleRef: rbacv1.RoleRef{
-						Kind: "Role",
-						Name: role.Name,
+				kudov1alpha1.MustEncodeValueWithKind(
+					kudov1alpha1.GrantKindK8sRoleBinding,
+					kudov1alpha1.K8sRoleBindingGrant{
+						AllowedNamespaces: []string{namespace.Name},
+						RoleRef: rbacv1.RoleRef{
+							Kind: "Role",
+							Name: role.Name,
+						},
 					},
-				},
+				),
 			),
 		)
 
@@ -342,14 +347,16 @@ func TestEscalation_Controller_DenyEscalationIfPolicyChanges(t *testing.T) {
 	// Now admin mutates the policy.
 	gotPolicy.Spec.Target.Grants = append(
 		policy.Spec.Target.Grants,
-		kudov1alpha1.EscalationGrant{
-			Kind:             grant.K8sRoleBindingKind,
-			DefaultNamespace: "foo",
-			RoleRef: rbacv1.RoleRef{
-				Kind: "ClusterRole",
-				Name: "some-other-role",
+		kudov1alpha1.MustEncodeValueWithKind(
+			kudov1alpha1.GrantKindK8sRoleBinding,
+			kudov1alpha1.K8sRoleBindingGrant{
+				DefaultNamespace: "foo",
+				RoleRef: rbacv1.RoleRef{
+					Kind: "ClusterRole",
+					Name: "some-other-role",
+				},
 			},
-		},
+		),
 	)
 
 	_, err = admin.kudo.K8sV1alpha1().EscalationPolicies().Update(ctx, gotPolicy, metav1.UpdateOptions{})
@@ -395,14 +402,16 @@ func TestEscalation_Controller_DropsPermissionsIfEscalationDeleted(t *testing.T)
 			t,
 			withDefaultDuration(60*time.Minute), // Should not expire.
 			withGrants(
-				kudov1alpha1.EscalationGrant{
-					Kind:              grant.K8sRoleBindingKind,
-					AllowedNamespaces: []string{namespace.Name},
-					RoleRef: rbacv1.RoleRef{
-						Kind: "Role",
-						Name: role.Name,
+				kudov1alpha1.MustEncodeValueWithKind(
+					kudov1alpha1.GrantKindK8sRoleBinding,
+					kudov1alpha1.K8sRoleBindingGrant{
+						AllowedNamespaces: []string{namespace.Name},
+						RoleRef: rbacv1.RoleRef{
+							Kind: "Role",
+							Name: role.Name,
+						},
 					},
-				},
+				),
 			),
 		)
 
