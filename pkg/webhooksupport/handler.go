@@ -2,17 +2,11 @@ package webhooksupport
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
-)
-
-var (
-	ErrUnexpectedKind      = errors.New("unexpected kind")
-	ErrUnexpectedOperation = errors.New("unexpected operation")
 )
 
 var (
