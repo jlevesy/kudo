@@ -13,7 +13,6 @@ import (
 	"github.com/jlevesy/kudo/escalationpolicy"
 	kudo "github.com/jlevesy/kudo/pkg/apis/k8s.kudo.dev"
 	kudov1alpha1 "github.com/jlevesy/kudo/pkg/apis/k8s.kudo.dev/v1alpha1"
-	"github.com/jlevesy/kudo/pkg/webhooksupport"
 	"github.com/jlevesy/kudo/pkg/webhooksupport/webhooktesting"
 )
 
@@ -24,17 +23,6 @@ func TestAdmissionRevierer_ReviewAdmission(t *testing.T) {
 		wantResp *admissionv1.AdmissionResponse
 		wantErr  error
 	}{
-		{
-			desc: "raises error if request has wrong kind",
-			req: &admissionv1.AdmissionRequest{
-				Kind: metav1.GroupVersionKind{
-					Group:   kudo.GroupName,
-					Version: kudov1alpha1.Version,
-					Kind:    kudov1alpha1.KindEscalation,
-				},
-			},
-			wantErr: webhooksupport.ErrUnexpectedKind,
-		},
 		{
 			desc: "denies if policy doesn't have a default duration",
 			req: &admissionv1.AdmissionRequest{
