@@ -14,6 +14,70 @@ import (
 	kudov1alpha1 "github.com/jlevesy/kudo/pkg/apis/k8s.kudo.dev/v1alpha1"
 )
 
+// This test makes sure that users can't update or delete any escalations.
+func TestEscalation_Controller_DeniesUpdatingOrDeletingEscalations(t *testing.T) {
+	t.Parallel()
+
+	var (
+		ctx       = context.Background()
+		namespace = generateNamespace(t, 0)
+		role      = generateRole(t, 0, namespace.Name, rbacv1.PolicyRule{
+			Verbs:     []string{"list"},
+			APIGroups: []string{""},
+			Resources: []string{"pods"},
+		})
+		policy = generateEscalationPolicy(
+			t,
+			withDefaultDuration(90*time.Second),
+			withGrants(
+				kudov1alpha1.MustEncodeValueWithKind(
+					kudov1alpha1.GrantKindK8sRoleBinding,
+					kudov1alpha1.K8sRoleBindingGrant{
+						AllowedNamespaces: []string{namespace.Name},
+						RoleRef: rbacv1.RoleRef{
+							Kind: "Role",
+							Name: role.Name,
+						},
+					},
+				),
+			),
+		)
+
+		escalation = generateEscalation(
+			t,
+			policy.Name,
+			withNamespace(namespace.Name),
+			withDuration(5*time.Second),
+		)
+
+		err error
+	)
+
+	_, err = admin.k8s.CoreV1().Namespaces().Create(ctx, &namespace, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	_, err = admin.k8s.RbacV1().Roles(namespace.Name).Create(
+		ctx,
+		&role,
+		metav1.CreateOptions{},
+	)
+	require.NoError(t, err)
+
+	_, err = admin.kudo.K8sV1alpha1().EscalationPolicies().Create(ctx, &policy, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	assertPolicyCreated(t, policy.Name)
+
+	_, err = userA.kudo.K8sV1alpha1().Escalations().Create(ctx, &escalation, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	_, err = userA.kudo.K8sV1alpha1().Escalations().Update(ctx, &escalation, metav1.UpdateOptions{})
+	require.Error(t, err)
+
+	err = userA.kudo.K8sV1alpha1().Escalations().Delete(ctx, escalation.Name, metav1.DeleteOptions{})
+	require.Error(t, err)
+}
+
 // This test makes sure that users can ask escalation with custom durations.
 func TestEscalation_Controller_UsesEscalationDuration(t *testing.T) {
 	t.Parallel()
