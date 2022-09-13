@@ -20,7 +20,6 @@ import (
 	"github.com/jlevesy/kudo/pkg/generated/clientset/versioned/fake"
 	kudoinformers "github.com/jlevesy/kudo/pkg/generated/informers/externalversions"
 	"github.com/jlevesy/kudo/pkg/generics"
-	"github.com/jlevesy/kudo/pkg/webhooksupport"
 	"github.com/jlevesy/kudo/pkg/webhooksupport/webhooktesting"
 )
 
@@ -82,7 +81,7 @@ var (
 	}
 )
 
-func TestEscalationAdmissionReviewer_ReviewAdmission(t *testing.T) {
+func TestCreateEscalationAdmissionReviewer_ReviewAdmission(t *testing.T) {
 	testCases := []struct {
 		desc    string
 		request *admissionv1.AdmissionRequest
@@ -93,29 +92,8 @@ func TestEscalationAdmissionReviewer_ReviewAdmission(t *testing.T) {
 		wantResponse *admissionv1.AdmissionResponse
 	}{
 		{
-			desc: "raises an error if kind is unexpected",
-			request: &admissionv1.AdmissionRequest{
-				Kind: metav1.GroupVersionKind{
-					Group:   "something.bar",
-					Version: "v1",
-					Kind:    "Something",
-				},
-			},
-			wantError: webhooksupport.ErrUnexpectedKind,
-		},
-		{
-			desc: "raises an error if operation is not CREATE",
-			request: &admissionv1.AdmissionRequest{
-				Kind:      escalation.ExpectedKind,
-				Operation: admissionv1.Delete,
-			},
-			wantError: webhooksupport.ErrUnexpectedOperation,
-		},
-		{
 			desc: "denies if the policy is not known",
 			request: &admissionv1.AdmissionRequest{
-				Kind:      escalation.ExpectedKind,
-				Operation: admissionv1.Create,
 				Object: runtime.RawExtension{
 					Raw: webhooktesting.EncodeObject(
 						t,
@@ -139,8 +117,6 @@ func TestEscalationAdmissionReviewer_ReviewAdmission(t *testing.T) {
 		{
 			desc: "denies if the escalation has no reason",
 			request: &admissionv1.AdmissionRequest{
-				Kind:      escalation.ExpectedKind,
-				Operation: admissionv1.Create,
 				Object: runtime.RawExtension{
 					Raw: webhooktesting.EncodeObject(
 						t,
@@ -166,8 +142,6 @@ func TestEscalationAdmissionReviewer_ReviewAdmission(t *testing.T) {
 		{
 			desc: "denies if the user is not allowed to use the policy",
 			request: &admissionv1.AdmissionRequest{
-				Kind:      escalation.ExpectedKind,
-				Operation: admissionv1.Create,
 				Object: runtime.RawExtension{
 					Raw: webhooktesting.EncodeObject(
 						t,
@@ -194,8 +168,6 @@ func TestEscalationAdmissionReviewer_ReviewAdmission(t *testing.T) {
 		{
 			desc: "denies if the duration asked by the user exceeds the policy max duration",
 			request: &admissionv1.AdmissionRequest{
-				Kind:      escalation.ExpectedKind,
-				Operation: admissionv1.Create,
 				Object: runtime.RawExtension{
 					Raw: webhooktesting.EncodeObject(
 						t,
@@ -223,8 +195,6 @@ func TestEscalationAdmissionReviewer_ReviewAdmission(t *testing.T) {
 		{
 			desc: "denies if the refered policy has an unsupported grant kind",
 			request: &admissionv1.AdmissionRequest{
-				Kind:      escalation.ExpectedKind,
-				Operation: admissionv1.Create,
 				Object: runtime.RawExtension{
 					Raw: webhooktesting.EncodeObject(
 						t,
@@ -251,8 +221,6 @@ func TestEscalationAdmissionReviewer_ReviewAdmission(t *testing.T) {
 		{
 			desc: "denies if the escalation is not compatible with grant",
 			request: &admissionv1.AdmissionRequest{
-				Kind:      escalation.ExpectedKind,
-				Operation: admissionv1.Create,
 				Object: runtime.RawExtension{
 					Raw: webhooktesting.EncodeObject(
 						t,
@@ -280,8 +248,6 @@ func TestEscalationAdmissionReviewer_ReviewAdmission(t *testing.T) {
 		{
 			desc: "allows users by username",
 			request: &admissionv1.AdmissionRequest{
-				Kind:      escalation.ExpectedKind,
-				Operation: admissionv1.Create,
 				Object: runtime.RawExtension{
 					Raw: webhooktesting.EncodeObject(
 						t,
@@ -307,8 +273,6 @@ func TestEscalationAdmissionReviewer_ReviewAdmission(t *testing.T) {
 		{
 			desc: "allows users by group membership",
 			request: &admissionv1.AdmissionRequest{
-				Kind:      escalation.ExpectedKind,
-				Operation: admissionv1.Create,
 				Object: runtime.RawExtension{
 					Raw: webhooktesting.EncodeObject(
 						t,
@@ -352,7 +316,7 @@ func TestEscalationAdmissionReviewer_ReviewAdmission(t *testing.T) {
 					},
 				}
 
-				reviewer = escalation.NewAdmissionReviewer(
+				reviewer = escalation.NewCreateAdmissionReviewer(
 					escalationPolicyInformer.Lister(),
 					grant.StaticFactory{
 						testGrantKind: injectMockGranter(&dummyGranter),
