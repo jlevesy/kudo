@@ -33,7 +33,7 @@ webhooks:
   rules:
   - apiGroups:   ["k8s.kudo.dev"]
     apiVersions: ["v1alpha1"]
-    operations:  ["CREATE"]
+    operations:  ["CREATE", "UPDATE", "DELETE", "CONNECT"]
     resources:   ["escalations"]
     scope:       "Cluster"
   clientConfig:
