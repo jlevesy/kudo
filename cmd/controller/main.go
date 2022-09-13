@@ -109,22 +109,12 @@ func main() {
 			kudov1alpha1.KindEscalation,
 			threadiness,
 		)
-		escalationReviewer = escalation.NewAdmissionReviewer(policiesLister, granterFactory)
 	)
 
 	escalationsInformer.AddEventHandler(escalationController)
-	serveMux.Handle(
-		"/v1alpha1/escalationpolicies",
-		webhooksupport.NewHandler(
-			escalationpolicy.NewAdmissionReviewer(),
-		),
-	)
-	serveMux.Handle(
-		"/v1alpha1/escalations",
-		webhooksupport.NewHandler(
-			escalationReviewer,
-		),
-	)
+
+	escalationpolicy.SetupWebhook(serveMux)
+	escalation.SetupWebhook(serveMux, kudoInformerFactory, granterFactory)
 	serveMux.HandleFunc("/healthz", func(rw http.ResponseWriter, r *http.Request) {
 		rw.WriteHeader(http.StatusOK)
 		_, _ = rw.Write([]byte("ok"))
