@@ -3,7 +3,6 @@ package webhooksupport_test
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -53,26 +52,6 @@ func TestWebhookHandler_ServeHTTP(t *testing.T) {
 			)),
 			wantStatus: http.StatusOK,
 			wantReview: &admissionv1.AdmissionReview{
-				Response: &admissionv1.AdmissionResponse{
-					Result: &metav1.Status{
-						Status:  metav1.StatusFailure,
-						Message: "Unexpected error, see controller logs for details",
-					},
-				},
-			},
-		},
-		{
-			desc: "complains if reviewer answers an error",
-			request: httptest.NewRequest(http.MethodPost, "/webhook", webhooktesting.EncodeObject(
-				t,
-				&admissionv1.AdmissionReview{
-					Request: &admissionv1.AdmissionRequest{},
-				},
-			)),
-			reviewerError: errors.New("hahaha"),
-			wantStatus:    http.StatusOK,
-			wantReview: &admissionv1.AdmissionReview{
-				Request: &admissionv1.AdmissionRequest{},
 				Response: &admissionv1.AdmissionResponse{
 					Result: &metav1.Status{
 						Status:  metav1.StatusFailure,

@@ -14,60 +14,25 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/jlevesy/kudo/grant"
-	kudo "github.com/jlevesy/kudo/pkg/apis/k8s.kudo.dev"
 	"github.com/jlevesy/kudo/pkg/apis/k8s.kudo.dev/v1alpha1"
 	kudov1alpha1 "github.com/jlevesy/kudo/pkg/apis/k8s.kudo.dev/v1alpha1"
 	"github.com/jlevesy/kudo/pkg/generics"
-	"github.com/jlevesy/kudo/pkg/webhooksupport"
-)
-
-var (
-	ExpectedKind = metav1.GroupVersionKind{
-		Group:   kudo.GroupName,
-		Version: kudov1alpha1.Version,
-		Kind:    kudov1alpha1.KindEscalation,
-	}
-
-	UnexpectedErrorStatus = metav1.Status{
-		Status:  metav1.StatusFailure,
-		Message: "Unexpected error, see controller logs for details",
-	}
 )
 
 type EscalationPoliciesGetter interface {
 	Get(name string) (*v1alpha1.EscalationPolicy, error)
 }
 
-type AdmissionReviewer struct {
+type createAdmissionReviewer struct {
 	policiesGetter EscalationPoliciesGetter
 	grantFactory   grant.Factory
 }
 
-func NewAdmissionReviewer(g EscalationPoliciesGetter, f grant.Factory) *AdmissionReviewer {
-	return &AdmissionReviewer{policiesGetter: g, grantFactory: f}
+func NewCreateAdmissionReviewer(g EscalationPoliciesGetter, f grant.Factory) *createAdmissionReviewer {
+	return &createAdmissionReviewer{policiesGetter: g, grantFactory: f}
 }
 
-func (r *AdmissionReviewer) ReviewAdmission(ctx context.Context, req *admissionv1.AdmissionRequest) (*admissionv1.AdmissionResponse, error) {
-	if req.Kind != ExpectedKind {
-		klog.Errorf(
-			"Received unexpected review kind %q for user %q",
-			req.Kind,
-			req.UserInfo.Username,
-		)
-
-		return nil, webhooksupport.ErrUnexpectedKind
-	}
-
-	if req.Operation != admissionv1.Create {
-		klog.Errorf(
-			"Received unexpected operation %q for user %q",
-			req.Operation,
-			req.UserInfo.Username,
-		)
-
-		return nil, webhooksupport.ErrUnexpectedOperation
-	}
-
+func (r *createAdmissionReviewer) ReviewAdmission(ctx context.Context, req *admissionv1.AdmissionRequest) (*admissionv1.AdmissionResponse, error) {
 	var escalation kudov1alpha1.Escalation
 
 	if err := json.Unmarshal(req.Object.Raw, &escalation); err != nil {

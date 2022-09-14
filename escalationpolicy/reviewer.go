@@ -8,36 +8,17 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 
-	kudo "github.com/jlevesy/kudo/pkg/apis/k8s.kudo.dev"
 	kudov1alpha1 "github.com/jlevesy/kudo/pkg/apis/k8s.kudo.dev/v1alpha1"
 	"github.com/jlevesy/kudo/pkg/webhooksupport"
 )
 
-var (
-	expectedKind = metav1.GroupVersionKind{
-		Group:   kudo.GroupName,
-		Version: kudov1alpha1.Version,
-		Kind:    kudov1alpha1.KindEscalationPolicy,
-	}
-)
+type admissionReviewer struct{}
 
-type AdmissionReviewer struct{}
-
-func NewAdmissionReviewer() *AdmissionReviewer {
-	return &AdmissionReviewer{}
+func NewAdmissionReviewer() webhooksupport.AdmissionReviewer {
+	return &admissionReviewer{}
 }
 
-func (r *AdmissionReviewer) ReviewAdmission(ctx context.Context, req *admissionv1.AdmissionRequest) (*admissionv1.AdmissionResponse, error) {
-	if req.Kind != expectedKind {
-		klog.Errorf(
-			"Received unexpected review kind %q for user %q",
-			req.Kind,
-			req.UserInfo.Username,
-		)
-
-		return nil, webhooksupport.ErrUnexpectedKind
-	}
-
+func (r *admissionReviewer) ReviewAdmission(ctx context.Context, req *admissionv1.AdmissionRequest) (*admissionv1.AdmissionResponse, error) {
 	var policy kudov1alpha1.EscalationPolicy
 
 	if err := json.Unmarshal(req.Object.Raw, &policy); err != nil {
