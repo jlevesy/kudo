@@ -36,7 +36,7 @@ Here's a list of tools you need to have installed to run your development enviro
 
 You need to have both `kudo-registry.localhost` and `kudo-e2e-registry.localhost` configured to resolve to 127.0.0.1 in your development environment.
 
-### Runing the Development Environment
+### Using the Development Environment
 
 The folowing command line spins up a k3d cluster, provision necessary resources and install your current tree version of kudo in the cluster.
 
@@ -47,13 +47,25 @@ make run_dev
 To simulate an escalation. This will switch your current kubectl context to the kudo test user, create the permission, then switch back to the admin context.
 
 ```bash
-make run_escalation_dev
+make escalate_dev
 ```
 
 To display the controller logs
 
 ```bash
 make logs_dev
+```
+
+When you're done:
+
+```bash
+make stop_dev
+```
+
+And if you're in need
+
+```bash
+make help
 ```
 
 ### Runing the Test Suite
