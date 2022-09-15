@@ -13,6 +13,7 @@ import (
 
 var (
 	nok3dCleanup, _ = strconv.ParseBool(os.Getenv("NO_K3D_CLEANUP"))
+	k3sVersion      = os.Getenv("K3S_VERSION")
 )
 
 func TestMain(m *testing.M) {
@@ -36,7 +37,7 @@ func run(m *testing.M) int {
 
 	klog.Info("/etc/hosts file properly configured")
 
-	klog.Info("Booting a k3d cluster")
+	klog.Info("Booting a k3d cluster, with k3s version: ", k3sVersion)
 	if err := hasK3dCluster(ctx, k3dClusterName); err == nil {
 		klog.Info("Found an existing cluster, cleaning it up")
 
@@ -46,7 +47,7 @@ func run(m *testing.M) int {
 		}
 	}
 
-	if err := runK3dCluster(ctx, k3dClusterName); err != nil {
+	if err := runK3dCluster(ctx, k3dClusterName, k3sVersion); err != nil {
 		klog.ErrorS(err, "Unable to create a k3d cluster")
 		return 1
 	}

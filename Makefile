@@ -2,6 +2,8 @@ CODE_GENERATOR_VERSION=0.24.3
 COUNT?=1
 T?=""
 
+K3S_VERSION?=v1.25.0-k3s1
+
 .PHONY: install_dependencies
 install_dependencies:
 	go get ./...
@@ -13,7 +15,7 @@ unit_tests:
 
 .PHONY: e2e_tests
 e2e_tests:
-	go test -failfast -count=$(COUNT) -run=$(T) -v ./e2e
+	K3S_VERSION=$(K3S_VERSION) go test -failfast -count=$(COUNT) -run=$(T) -v ./e2e
 
 .PHONY: codegen
 codegen:

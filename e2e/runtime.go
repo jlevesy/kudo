@@ -319,7 +319,7 @@ func buildClientSet(cfg *restclient.Config, userName string) (clientSet, error) 
 	}, nil
 }
 
-func runK3dCluster(ctx context.Context, clusterName string) error {
+func runK3dCluster(ctx context.Context, clusterName, k3sVersion string) error {
 	return execCmd(
 		ctx,
 		execCall{
@@ -328,7 +328,7 @@ func runK3dCluster(ctx context.Context, clusterName string) error {
 				"cluster",
 				"create",
 				clusterName,
-				"--image=rancher/k3s:v1.24.3-k3s1",
+				"--image=rancher/k3s:" + k3sVersion,
 				fmt.Sprintf("--registry-create=%s:0.0.0.0:5001", registryDomain),
 				"--no-lb",
 				"--kubeconfig-switch-context=false",
