@@ -152,45 +152,27 @@ func TestEscalation_Controller_UsesEscalationDuration(t *testing.T) {
 	require.NoError(t, err)
 
 	// admin waits for escalation to reach state ACCEPTED, and grants are created
-	rawEsc := assertObjectUpdated(
+	assertEscalationInState(
 		t,
-		admin.kudo.K8sV1alpha1().RESTClient(),
-		resourceNameNamespace{
-			resource: "escalations",
-			name:     escalation.Name,
-			global:   true,
-		},
-		condEscalationStatusMatchesSpec(
-			escalationWaitCondSpec{
-				state: kudov1alpha1.StateAccepted,
-				grantStatuses: []kudov1alpha1.GrantStatus{
-					kudov1alpha1.GrantStatusCreated,
-				},
+		escalation.Name,
+		escalationWaitCondSpec{
+			state: kudov1alpha1.StateAccepted,
+			grantStatuses: []kudov1alpha1.GrantStatus{
+				kudov1alpha1.GrantStatusCreated,
 			},
-		),
-		30*time.Second,
+		},
 	)
 
-	gotEsc := as[*kudov1alpha1.Escalation](t, rawEsc)
-
 	// After a while, escalation expires.
-	assertObjectUpdated(
+	gotEsc := assertEscalationInState(
 		t,
-		admin.kudo.K8sV1alpha1().RESTClient(),
-		resourceNameNamespace{
-			resource: "escalations",
-			name:     escalation.Name,
-			global:   true,
-		},
-		condEscalationStatusMatchesSpec(
-			escalationWaitCondSpec{
-				state: kudov1alpha1.StateExpired,
-				grantStatuses: []kudov1alpha1.GrantStatus{
-					kudov1alpha1.GrantStatusReclaimed,
-				},
+		escalation.Name,
+		escalationWaitCondSpec{
+			state: kudov1alpha1.StateExpired,
+			grantStatuses: []kudov1alpha1.GrantStatus{
+				kudov1alpha1.GrantStatusReclaimed,
 			},
-		),
-		30*time.Second,
+		},
 	)
 
 	// Bindings are reclaimed.
@@ -250,45 +232,27 @@ func TestEscalation_Controller_RecordsEscalationEvent(t *testing.T) {
 	require.NoError(t, err)
 
 	// admin waits for escalation to reach state ACCEPTED, and grants are created
-	rawEsc := assertObjectUpdated(
+	assertEscalationInState(
 		t,
-		admin.kudo.K8sV1alpha1().RESTClient(),
-		resourceNameNamespace{
-			resource: "escalations",
-			name:     escalation.Name,
-			global:   true,
-		},
-		condEscalationStatusMatchesSpec(
-			escalationWaitCondSpec{
-				state: kudov1alpha1.StateAccepted,
-				grantStatuses: []kudov1alpha1.GrantStatus{
-					kudov1alpha1.GrantStatusCreated,
-				},
+		escalation.Name,
+		escalationWaitCondSpec{
+			state: kudov1alpha1.StateAccepted,
+			grantStatuses: []kudov1alpha1.GrantStatus{
+				kudov1alpha1.GrantStatusCreated,
 			},
-		),
-		30*time.Second,
+		},
 	)
 
-	gotEsc := as[*kudov1alpha1.Escalation](t, rawEsc)
-
 	// After a while, escalation expires.
-	assertObjectUpdated(
+	gotEsc := assertEscalationInState(
 		t,
-		admin.kudo.K8sV1alpha1().RESTClient(),
-		resourceNameNamespace{
-			resource: "escalations",
-			name:     escalation.Name,
-			global:   true,
-		},
-		condEscalationStatusMatchesSpec(
-			escalationWaitCondSpec{
-				state: kudov1alpha1.StateExpired,
-				grantStatuses: []kudov1alpha1.GrantStatus{
-					kudov1alpha1.GrantStatusReclaimed,
-				},
+		escalation.Name,
+		escalationWaitCondSpec{
+			state: kudov1alpha1.StateExpired,
+			grantStatuses: []kudov1alpha1.GrantStatus{
+				kudov1alpha1.GrantStatusReclaimed,
 			},
-		),
-		30*time.Second,
+		},
 	)
 
 	// Bindings are reclaimed.
@@ -387,26 +351,16 @@ func TestEscalation_Controller_DenyEscalationIfPolicyChanges(t *testing.T) {
 	require.NoError(t, err)
 
 	// admin waits for escalation to reach state ACCEPTED, and grants are created
-	rawEsc := assertObjectUpdated(
+	gotEsc := assertEscalationInState(
 		t,
-		admin.kudo.K8sV1alpha1().RESTClient(),
-		resourceNameNamespace{
-			resource: "escalations",
-			name:     escalation.Name,
-			global:   true,
-		},
-		condEscalationStatusMatchesSpec(
-			escalationWaitCondSpec{
-				state: kudov1alpha1.StateAccepted,
-				grantStatuses: []kudov1alpha1.GrantStatus{
-					kudov1alpha1.GrantStatusCreated,
-				},
+		escalation.Name,
+		escalationWaitCondSpec{
+			state: kudov1alpha1.StateAccepted,
+			grantStatuses: []kudov1alpha1.GrantStatus{
+				kudov1alpha1.GrantStatusCreated,
 			},
-		),
-		30*time.Second,
+		},
 	)
-
-	gotEsc := as[*kudov1alpha1.Escalation](t, rawEsc)
 
 	// Now admin mutates the policy.
 	gotPolicy.Spec.Target.Grants = append(
@@ -427,23 +381,15 @@ func TestEscalation_Controller_DenyEscalationIfPolicyChanges(t *testing.T) {
 	require.NoError(t, err)
 
 	// Kudo should respond and deny the escalation.
-	assertObjectUpdated(
+	assertEscalationInState(
 		t,
-		admin.kudo.K8sV1alpha1().RESTClient(),
-		resourceNameNamespace{
-			resource: "escalations",
-			name:     escalation.Name,
-			global:   true,
-		},
-		condEscalationStatusMatchesSpec(
-			escalationWaitCondSpec{
-				state: kudov1alpha1.StateDenied,
-				grantStatuses: []kudov1alpha1.GrantStatus{
-					kudov1alpha1.GrantStatusReclaimed,
-				},
+		escalation.Name,
+		escalationWaitCondSpec{
+			state: kudov1alpha1.StateDenied,
+			grantStatuses: []kudov1alpha1.GrantStatus{
+				kudov1alpha1.GrantStatusReclaimed,
 			},
-		),
-		30*time.Second,
+		},
 	)
 
 	// Bindings are reclaimed.
@@ -503,26 +449,16 @@ func TestEscalation_Controller_DropsPermissionsIfEscalationDeleted(t *testing.T)
 	require.NoError(t, err)
 
 	// admin waits for escalation to reach state ACCEPTED, and grants are created
-	rawEsc := assertObjectUpdated(
+	gotEsc := assertEscalationInState(
 		t,
-		admin.kudo.K8sV1alpha1().RESTClient(),
-		resourceNameNamespace{
-			resource: "escalations",
-			name:     escalation.Name,
-			global:   true,
-		},
-		condEscalationStatusMatchesSpec(
-			escalationWaitCondSpec{
-				state: kudov1alpha1.StateAccepted,
-				grantStatuses: []kudov1alpha1.GrantStatus{
-					kudov1alpha1.GrantStatusCreated,
-				},
+		escalation.Name,
+		escalationWaitCondSpec{
+			state: kudov1alpha1.StateAccepted,
+			grantStatuses: []kudov1alpha1.GrantStatus{
+				kudov1alpha1.GrantStatusCreated,
 			},
-		),
-		30*time.Second,
+		},
 	)
-
-	gotEsc := as[*kudov1alpha1.Escalation](t, rawEsc)
 
 	// Now admin deletes the escalation.
 	err = admin.kudo.K8sV1alpha1().EscalationPolicies().Delete(ctx, gotEsc.Name, metav1.DeleteOptions{})

@@ -15,45 +15,46 @@ import (
 	"k8s.io/client-go/rest"
 
 	kudov1alpha1 "github.com/jlevesy/kudo/pkg/apis/k8s.kudo.dev/v1alpha1"
-	"github.com/jlevesy/kudo/pkg/generated/clientset/versioned/scheme"
+	kudoscheme "github.com/jlevesy/kudo/pkg/generated/clientset/versioned/scheme"
 	"github.com/jlevesy/kudo/pkg/generics"
 )
 
-func as[T runtime.Object](t *testing.T, obj runtime.Object) T {
-	v, ok := obj.(T)
-	if !ok {
-		t.Fatal("unable to convert")
-	}
-
-	return v
+func assertEscalationInState(t *testing.T, name string, spec escalationWaitCondSpec) *kudov1alpha1.Escalation {
+	return assertObjectUpdated(
+		t,
+		admin.kudo.K8sV1alpha1().RESTClient(),
+		kudoscheme.ParameterCodec,
+		resourceNameNamespace{
+			resource: "escalations",
+			name:     name,
+			global:   true,
+		},
+		condEscalationStatusMatchesSpec(spec),
+		30*time.Second,
+	).(*kudov1alpha1.Escalation)
 }
 
 func assertPolicyCreated(t *testing.T, name string) *kudov1alpha1.EscalationPolicy {
-	return assertObjectCreated(t, admin.kudo.K8sV1alpha1().RESTClient(), resourceNameNamespace{
-		resource: "escalationpolicies",
-		name:     name,
-		global:   true,
-	}, 3*time.Second).(*kudov1alpha1.EscalationPolicy)
+	return assertObjectCreated(
+		t,
+		admin.kudo.K8sV1alpha1().RESTClient(),
+		kudoscheme.ParameterCodec,
+		resourceNameNamespace{
+			resource: "escalationpolicies",
+			name:     name,
+			global:   true,
+		},
+		3*time.Second,
+	).(*kudov1alpha1.EscalationPolicy)
 }
 
-func assertObjectCreated(t *testing.T, client rest.Interface, resourceId resourceNameNamespace, timeout time.Duration) runtime.Object {
+func assertObjectCreated(t *testing.T, client rest.Interface, codec runtime.ParameterCodec, resourceId resourceNameNamespace, timeout time.Duration) runtime.Object {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	obj, err := buildGetRequest(client, resourceId).Do(ctx).Get()
-
-	switch {
-	// Objects already exists, it has been created.
-	case err == nil:
-		return obj
-	// Object hasn't yet been created, let's watch.
-	case k8serrors.IsNotFound(err):
-	default:
-		t.Fatal("unexpected error during assertObjectCreated:", err)
-	}
-
 	watchHandle, err := buildWatchRequest(
 		client,
+		codec,
 		resourceId,
 		metav1.ListOptions{
 			Watch:         true,
@@ -61,17 +62,17 @@ func assertObjectCreated(t *testing.T, client rest.Interface, resourceId resourc
 		},
 		timeout,
 	).Watch(ctx)
-
 	require.NoError(t, err)
+
 	defer watchHandle.Stop()
 
-	obj, err = waitForEvent(ctx, watchHandle, watch.Added)
+	obj, err := waitForEvent(ctx, watchHandle, watch.Added)
 	require.NoError(t, err)
 
 	return obj
 }
 
-func assertObjectDeleted(t *testing.T, client rest.Interface, resourceId resourceNameNamespace, timeout time.Duration) {
+func assertObjectDeleted(t *testing.T, client rest.Interface, codec runtime.ParameterCodec, resourceId resourceNameNamespace, timeout time.Duration) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -95,6 +96,7 @@ func assertObjectDeleted(t *testing.T, client rest.Interface, resourceId resourc
 
 	watchHandle, err := buildWatchRequest(
 		client,
+		codec,
 		resourceId,
 		metav1.ListOptions{
 			Watch:           true,
@@ -113,7 +115,7 @@ func assertObjectDeleted(t *testing.T, client rest.Interface, resourceId resourc
 
 type updateCondition func(runtime.Object) bool
 
-func assertObjectUpdated(t *testing.T, client rest.Interface, resourceId resourceNameNamespace, cond updateCondition, timeout time.Duration) runtime.Object {
+func assertObjectUpdated(t *testing.T, client rest.Interface, codec runtime.ParameterCodec, resourceId resourceNameNamespace, cond updateCondition, timeout time.Duration) runtime.Object {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -139,6 +141,7 @@ func assertObjectUpdated(t *testing.T, client rest.Interface, resourceId resourc
 
 	watchHandle, err := buildWatchRequest(
 		client,
+		codec,
 		resourceId,
 		metav1.ListOptions{
 			Watch:           true,
@@ -166,13 +169,13 @@ type resourceNameNamespace struct {
 	global    bool
 }
 
-func buildWatchRequest(client rest.Interface, resourceId resourceNameNamespace, opts metav1.ListOptions, timeout time.Duration) *rest.Request {
+func buildWatchRequest(client rest.Interface, codec runtime.ParameterCodec, resourceId resourceNameNamespace, opts metav1.ListOptions, timeout time.Duration) *rest.Request {
 	return client.
 		Get().
 		Resource(resourceId.resource).
 		VersionedParams(
 			&opts,
-			scheme.ParameterCodec,
+			codec,
 		).
 		Timeout(timeout)
 }

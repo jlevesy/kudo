@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	k8sscheme "k8s.io/client-go/kubernetes/scheme"
 
 	"github.com/jlevesy/kudo/pkg/apis/k8s.kudo.dev/v1alpha1"
 	kudov1alpha1 "github.com/jlevesy/kudo/pkg/apis/k8s.kudo.dev/v1alpha1"
@@ -53,6 +54,7 @@ func assertGrantedK8sResourcesCreated(t *testing.T, esc kudov1alpha1.Escalation,
 		assertObjectCreated(
 			t,
 			admin.k8s.RbacV1().RESTClient(),
+			k8sscheme.ParameterCodec,
 			resourceNameNamespace{
 				resource:  resource,
 				name:      k8sRef.Name,
@@ -71,6 +73,7 @@ func assertGrantedK8sResourcesDeleted(t *testing.T, esc kudov1alpha1.Escalation,
 		assertObjectDeleted(
 			t,
 			admin.k8s.RbacV1().RESTClient(),
+			k8sscheme.ParameterCodec,
 			resourceNameNamespace{
 				resource:  resource,
 				name:      k8sRef.Name,
