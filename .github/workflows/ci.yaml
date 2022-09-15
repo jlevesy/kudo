@@ -6,8 +6,8 @@ on:
   pull_request:
 
 jobs:
-  ci:
-    name: Continuous Integration
+  unit-tests:
+    name: Codegen And Unit Tests
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
@@ -24,17 +24,53 @@ jobs:
         run: make check_codegen
         env:
           GOPATH: /home/runner/go
+      - name: Run Unit Tests
+        run: make unit_tests
+
+  lint-code:
+    name: Lint code
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Install Go
+        uses: actions/setup-go@v3
+        with:
+          go-version-file: './go.mod'
+          check-latest: true
+          cache: true
       - name: Run Linter
         uses: golangci/golangci-lint-action@v3
         with:
           version: v1.48.0
           args: --timeout 5m
-      - name: Run Unit Tests
-        run: make unit_tests
+
+  lint-docs:
+    name: Lint docs
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Run Missspell
+        uses: reviewdog/action-misspell@v1
+        with:
+          locale: "US"
+          level: "info"
+          pattern: |
+            *.md
+          exclude: |
+            ./.git/*
 
   e2e-tests:
     name: e2e Test Suite
     runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        k3sVersion:
+          - "v1.25.0-k3s1"
+          - "v1.24.4-k3s1"
+          - "v1.23.10-k3s1"
+          - "v1.22.13-k3s1"
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -60,13 +96,18 @@ jobs:
           echo "127.0.0.1 kudo-e2e-registry.localhost" | sudo tee -a /etc/hosts
       - name: Run The e2e Test Suite
         run: make e2e_tests
+        env:
+          K3S_VERSION: ${{ matrix.k3sVersion }}
 
   release:
     name: Release
     runs-on: ubuntu-22.04
     if: startsWith(github.ref, 'refs/tags/')
     needs:
-      - ci
+      - unit-tests
+      - lint-code
+      - lint-docs
+      - e2e-tests
     steps:
       - name: Release a New Version
         run: echo "do this when there's something to release!"

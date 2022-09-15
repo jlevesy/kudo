@@ -20,8 +20,8 @@ func Serve(ctx context.Context, cfg ServerConfig, mux *http.ServeMux) error {
 		srv = &http.Server{
 			Addr:           cfg.Addr,
 			Handler:        mux,
-			ReadTimeout:    5 * time.Second,
-			WriteTimeout:   5 * time.Second,
+			ReadTimeout:    20 * time.Second,
+			WriteTimeout:   20 * time.Second,
 			MaxHeaderBytes: 1 << 20, // 1048576
 
 		}
