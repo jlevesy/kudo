@@ -38,7 +38,7 @@ You need to have both `kudo-registry.localhost` and `kudo-e2e-registry.localhost
 
 ### Using the Development Environment
 
-The folowing command line spins up a k3d cluster, provision necessary resources and install your current tree version of kudo in the cluster.
+The following command line spins up a k3d cluster, provision necessary resources and install your current tree version of kudo in the cluster.
 
 ```bash
 make run_dev
@@ -68,7 +68,7 @@ And if you're in need
 make help
 ```
 
-### Runing the Test Suite
+### Running the Test Suite
 
 - `make unit_tests` runs the unit test suite, ie all the tests defined in package.
 - `make e2e_tests` runs the end to end test suite, which simulate real kudo use cases. The test suite lives under the `./e2e` directory.
