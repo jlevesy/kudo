@@ -20,7 +20,9 @@ Though, if you like the idea, please let me know!
 
 The [kudo project](https://github.com/users/jlevesy/projects/1) pretty much carries all what I have in mind for kudo. Feel free to pick a task in the `TODO` column.
 
-### Tooling
+### Development Environment
+
+#### Tooling
 
 Here's a list of tools you need to have installed to run your development environment.
 
@@ -32,11 +34,11 @@ Here's a list of tools you need to have installed to run your development enviro
 - OpenSSL
 - (For the documentation) [hugo](https://gohugo.io/)
 
-### Configuration
+#### Configuration
 
 You need to have both `kudo-registry.localhost` and `kudo-e2e-registry.localhost` configured to resolve to 127.0.0.1 in your development environment.
 
-### Using the Development Environment
+#### Using the Development Environment
 
 The following command line spins up a k3d cluster, provision necessary resources and install your current tree version of kudo in the cluster.
 
@@ -68,11 +70,11 @@ And if you're in need
 make help
 ```
 
-### Running the Test Suite
+#### Running the Test Suite
 
 - `make unit_tests` runs the unit test suite, ie all the tests defined in package.
 - `make e2e_tests` runs the end to end test suite, which simulate real kudo use cases. The test suite lives under the `./e2e` directory.
 
-### Serving The Documentation
+#### Serving The Documentation
 
 - `make serve_docs` starts a local webserver. You can then go to `http://localhost:1313/kudo` to check your local doc.
