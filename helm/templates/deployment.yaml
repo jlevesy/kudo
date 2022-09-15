@@ -36,14 +36,14 @@ spec:
             - "-webhook_key"
             - "/var/run/certs/tls.key"
             - "-webhook_addr"
-            - ":443"
+            - ":8443"
             - "-resync_interval"
             - {{ .Values.controller.resyncInterval | quote }}
             - "-retry_interval"
             - {{ .Values.controller.retryInterval | quote }}
           ports:
             - name: https
-              containerPort: 443
+              containerPort: 8443
               protocol: TCP
           startupProbe:
             httpGet:
