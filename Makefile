@@ -45,7 +45,7 @@ check_hugo:
 ##@ Development Environment (main commands, use them)
 
 .PHONY: run_dev
-run_dev: preflight_check_dev create_cluster_dev deploy_dev create_test_user_dev wait_controller_ready_dev deploy_environment_resources_dev install_kubectl_escalate_plugin_dev ## Runs the development envionment
+run_dev: preflight_check_dev create_cluster_dev deploy_dev create_test_user_dev wait_controller_ready_dev deploy_environment_resources_dev install_kubectl_plugin_dev ## Runs the development envionment
 
 .PHONY: stop_dev
 stop_dev: delete_cluster_dev delete_test_user_dev ## Stop and delete the development envionment
@@ -121,9 +121,9 @@ use_admin_user_dev: ## Switch to the admin user
 use_test_user_dev: ## Switch to the test user
 	kubectl config use-context kudo-test-user
 
-.PHONY: install_kubectl_escalate_plugin_dev
-install_kubectl_escalate_plugin_dev: ## Install the kubectl plugin
-	go install ./cmd/kubectl-kudo-escalate
+.PHONY: install_kubectl_plugin_dev
+install_kubectl_plugin_dev: ## Install the kubectl plugin
+	go install ./cmd/kubectl-kudo
 
 .PHONY: preflight_check_dev
 preflight_check_dev: ## Checks that all the necesary binaries are present
