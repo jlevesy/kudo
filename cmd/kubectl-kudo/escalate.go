@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -16,21 +15,26 @@ import (
 	kudoclientset "github.com/jlevesy/kudo/pkg/generated/clientset/versioned"
 )
 
-func main() {
-	if err := newKudoEscalatePluginCmd().Execute(); err != nil {
-		os.Exit(1)
-	}
-}
-
-func newKudoEscalatePluginCmd() *cobra.Command {
+func newEscalateCmd() *cobra.Command {
 	config := runEscalateCfg{
 		ConfigFlags: genericclioptions.NewConfigFlags(true),
 	}
+
 	cmd := cobra.Command{
-		Use:          "kubectl kudo escalate [policy name] [reason]",
-		Short:        "kudo kubectl escalate creates a new kudo escalation",
+		Use:          "escalate",
+		Short:        "Create a new kudo escalation",
 		SilenceUsage: true,
-		Long: `kudo kubectl escalate creates a new kudo escalation.
+		Long: `Kudo escalate creates a new kudo escalation.
+
+Examples:
+  To escalate using the policy "gain-read-configmaps" during the default duration on the default namespace, run:
+    kubectl kudo escalate gain-read-configmaps --reason="Need access to configmaps"
+
+  To escalate using the policy "gain-read-configmaps" during the default duration on the namespace application-a, run:
+    kubectl kudo escalate gain-read-configmaps --namespace=appliation-a --reason="Need access to configmaps"
+
+  To escalate using the policy "gain-read-configmaps" during 30s on the namespace application-a, run:
+    kubectl kudo escalate gain-read-configmaps --namespace=appliation-a --duration=30s --reason="Need access to configmaps"
 
 Find more information at:
 	https://github.com/jlevesy/kudo
@@ -56,9 +60,9 @@ type runEscalateCfg struct {
 }
 
 func runEscalate(cmd *cobra.Command, config runEscalateCfg, args []string) error {
-	parsedArgs, err := parseArgs(args)
+	parsedArgs, err := parseEscalateArgs(args)
 	if err != nil {
-		return err
+		return cmd.Help()
 	}
 
 	k8sConfig, err := config.ConfigFlags.ToRESTConfig()
@@ -155,7 +159,7 @@ type escalateArgs struct {
 	policyName string
 }
 
-func parseArgs(args []string) (escalateArgs, error) {
+func parseEscalateArgs(args []string) (escalateArgs, error) {
 	if len(args) < 1 {
 		return escalateArgs{}, errors.New("you need to provide a policy name")
 	}

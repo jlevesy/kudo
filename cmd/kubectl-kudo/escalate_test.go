@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestParseArges(t *testing.T) {
+func TestParseEscalateArgs(t *testing.T) {
 	testCases := []struct {
 		desc     string
 		rawArgs  []string
@@ -35,7 +35,7 @@ func TestParseArges(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.desc, func(t *testing.T) {
-			gotArgs, err := parseArgs(testCase.rawArgs)
+			gotArgs, err := parseEscalateArgs(testCase.rawArgs)
 			assert.Equal(t, testCase.wantErr, err)
 			assert.Equal(t, testCase.wantArgs, gotArgs)
 		})
