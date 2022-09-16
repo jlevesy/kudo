@@ -1,0 +1,17 @@
+audit:
+  sinks:
+    - kind: K8sEvents
+      namespace: "some-namespace"
+
+controller:
+  resyncInterval: 50s
+  retryInterval: 10s
+  informerResyncInterval: 30m
+  threadiness: 50
+
+webhook:
+  certPath: "/some/path/cert.pem"
+  keyPath: "/some/path/key.pem"
+  addr: ":8444"
+  readTimeout: 50s
+  writeTimeout: 20s

@@ -1,0 +1,4 @@
+audit:
+  sinks:
+    - kind: K8sEvents
+      namespace: "some-namespace"
