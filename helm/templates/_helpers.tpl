@@ -58,10 +58,17 @@ Create the name of the service account to use
 {{- end }}
 
 {{/*
-Create the name of the service account to use
+Create the name of the cert secret to use
 */}}
 {{- define "helm.certSecretName" -}}
 {{ include "helm.fullname" . }}-cert
+{{- end }}
+
+{{/*
+Create the name of the config configmap to use
+*/}}
+{{- define "helm.configConfigMapName" -}}
+{{ include "helm.fullname" . }}-config
 {{- end }}
 
 {{/*
