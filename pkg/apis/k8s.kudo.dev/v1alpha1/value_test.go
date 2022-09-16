@@ -33,6 +33,8 @@ func TestValueWithKind_EncodeDecode(t *testing.T) {
 	encValue, err := v1alpha1.EncodeValueWithKind(subject.Kind, gotData)
 	require.NoError(t, err)
 
+	assert.Equal(t, subject, encValue)
+
 	jsonBytes, err := json.Marshal(encValue)
 	require.NoError(t, err)
 
@@ -42,4 +44,26 @@ func TestValueWithKind_EncodeDecode(t *testing.T) {
 func TestValueWithKind_EncodeFailsOnArrays(t *testing.T) {
 	_, err := v1alpha1.EncodeValueWithKind("wrong", []int{1, 2, 3, 4})
 	require.Error(t, err)
+}
+
+func TestValueWithKind_EncodeEmptyStruct(t *testing.T) {
+	v, err := v1alpha1.EncodeValueWithKind("empty", struct{}{})
+	require.NoError(t, err)
+
+	got, err := v1alpha1.DecodeValueWithKind[struct{}](v)
+	require.NoError(t, err)
+
+	assert.Equal(t, &struct{}{}, got)
+}
+
+func TestValueWithKind_DirectEncodeDecode(t *testing.T) {
+	var subject v1alpha1.ValueWithKind
+
+	err := json.Unmarshal([]byte(rawPayload), &subject)
+	require.NoError(t, err)
+
+	gotPayload, err := json.Marshal(&subject)
+	require.NoError(t, err)
+
+	assert.Equal(t, string(rawPayload), string(gotPayload))
 }

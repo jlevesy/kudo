@@ -1,6 +1,7 @@
 package v1alpha1
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 )
@@ -27,12 +28,7 @@ func (a *ValueWithKind) UnmarshalJSON(p []byte) error {
 }
 
 func (a ValueWithKind) MarshalJSON() ([]byte, error) {
-	if len(a.payload) == 0 {
-		return nil, errors.New("unexpected marshal of an empty payload")
-	}
-
-	// I'm going to regret this.
-	return append([]byte(`{"kind":"`+a.Kind+`",`), a.payload[1:]...), nil
+	return a.payload, nil
 }
 
 func DecodeValueWithKind[V any](v ValueWithKind) (*V, error) {
@@ -64,5 +60,15 @@ func EncodeValueWithKind(kind string, value any) (ValueWithKind, error) {
 		return ValueWithKind{}, errors.New("encoding of arrays isn't supported")
 	}
 
-	return ValueWithKind{Kind: kind, payload: p}, nil
+	// I'm going to regret this.
+	if bytes.Equal(p, []byte("{}")) {
+		p = []byte(`{"kind":"` + kind + `"}`)
+	} else {
+		p = append([]byte(`{"kind":"`+kind+`",`), p[1:]...)
+	}
+
+	return ValueWithKind{
+		Kind:    kind,
+		payload: p,
+	}, nil
 }
