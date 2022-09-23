@@ -6,22 +6,17 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/jlevesy/kudo/controller"
 	"k8s.io/klog/v2"
 )
 
-type ServerConfig struct {
-	CertPath string
-	KeyPath  string
-	Addr     string
-}
-
-func Serve(ctx context.Context, cfg ServerConfig, mux *http.ServeMux) error {
+func Serve(ctx context.Context, cfg controller.WebhookConfig, mux *http.ServeMux) error {
 	var (
 		srv = &http.Server{
 			Addr:           cfg.Addr,
 			Handler:        mux,
-			ReadTimeout:    20 * time.Second,
-			WriteTimeout:   20 * time.Second,
+			ReadTimeout:    cfg.ReadTimeout.Duration,
+			WriteTimeout:   cfg.WriteTimeout.Duration,
 			MaxHeaderBytes: 1 << 20, // 1048576
 
 		}

@@ -1,8 +1,36 @@
 replicaCount: 1
 
-controller:
-  resyncInterval: 30s
-  retryInterval: 10s
+# Controller configuration.
+config:
+  # Configure audit sinks. How kudo persists user escalation activity.
+  audit:
+    # List of active sinks and their configuration.
+    sinks:
+      - kind: K8sEvents
+        namespace: ""
+  # Controller internal configuration. Defaults are usually fine.
+  controller:
+    # Maximum period between evaluations of the same escalation.
+    # A lower period means a more reactive system, however also means more CPU activity.
+    resyncInterval: 30s
+    # Period between two retry attempts when kudo fails to create / reclaim external resources.
+    retryInterval: 10s
+    # Period between two full state resyc. Ie when kudo reevaluates the status of all known escalations.
+    informerResyncInterval: 1h
+    # How many escalation events can be processed in parallel.
+    threadiness: 10
+  # Webhook server configuraiton. Defaults are usually fine.
+  webhook:
+    # Address to listen to.
+    addr: ":8443"
+    # Path to the webhook certificiate
+    certPath: "/var/run/certs/tls.crt"
+    # Path to the webhook private key
+    keyPath:  "/var/run/certs/tls.key"
+    # HTTP Read timeout.
+    readTimeout: 20s
+    # HTTP Write timeout.
+    writeTimeout: 20s
 
 image:
   repository: ghcr.io/jlevesy/kudo/controller

@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "helm.configConfigMapName" . }} 
+data:
+{{- with .Values.config }}
+  config.yaml: |-
+    {{- toYaml . | nindent 4 }}
+{{- end }}

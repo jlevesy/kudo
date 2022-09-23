@@ -31,16 +31,8 @@ spec:
           image: {{ include "helm.imageName" . }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args:
-            - "-webhook_cert"
-            - "/var/run/certs/tls.crt"
-            - "-webhook_key"
-            - "/var/run/certs/tls.key"
-            - "-webhook_addr"
-            - ":8443"
-            - "-resync_interval"
-            - {{ .Values.controller.resyncInterval | quote }}
-            - "-retry_interval"
-            - {{ .Values.controller.retryInterval | quote }}
+            - "-config"
+            - "/var/run/config/config.yaml"
           ports:
             - name: https
               containerPort: 8443
@@ -73,6 +65,9 @@ spec:
             - name: certs
               mountPath: /var/run/certs
               readOnly: true
+            - name: config
+              mountPath: /var/run/config
+              readOnly: true
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       {{- with .Values.nodeSelector }}
@@ -91,3 +86,6 @@ spec:
         - name: certs
           secret:
             secretName: {{ template "helm.certSecretName" . }}
+        - name: config
+          configMap:
+            name: {{ template "helm.configConfigMapName" . }}
